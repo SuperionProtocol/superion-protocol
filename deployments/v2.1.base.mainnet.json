@@ -1,0 +1,110 @@
+{
+  "version": "2.1",
+  "network": "base",
+  "chainId": 8453,
+  "deployedAt": "2026-10-07T12:08:04.565Z",
+  "deployer": "0xE60322A5543C2bAD26115053B586d9679F4A939f",
+  "superToken": "0x212EE291056C673283BF441d861CA8EF696cC422",
+  "guardian": "0xB633ae886bbb0939E0cB7130be0D367CED9f87D4",
+  "note": "Core only — token SUPER existant (immutable). Aucun transfert des 1B SUPER, aucun appel Safe. Admin=Timelock, gardien=Safe (PAUSER+CANCELLER). feeBps=0 au lancement (relevable par Governor).",
+  "contracts": {
+    "stakingV2": "0x92D9287B2aE16630d1b3b0fca26Aa0f09c957528",
+    "timelock": "0x1E2deB77C9A50F064b97f8C90Facc91c4D081151",
+    "governor": "0x22A2e573904730B1EC37B971052EF6Da7B3A0f80",
+    "marketplaceV2": "0x5F0297A5B5F5444920e6673f1b60D5d1f1b302C1"
+  },
+  "params": {
+    "marketplace": {
+      "feeBps": "0",
+      "burnShareBps": "5000",
+      "challengePeriod": "3600",
+      "seedRevealDelay": "60",
+      "seedRevealWindow": "180",
+      "voteCommitWindow": "150",
+      "voteRevealWindow": "150",
+      "arbitrationWindow": "3600",
+      "committeeSize": "3",
+      "providerStakeBps": "10000",
+      "slashVerifierBps": "2000",
+      "slashChallengerBps": "1000",
+      "minVerifierStake": "1000000000000000000000",
+      "verifierPenalty": "100000000000000000000",
+      "challengeBond": "25000000000000000000"
+    },
+    "governance": {
+      "votingDelay": "86400",
+      "votingPeriod": "432000",
+      "proposalThreshold": "100000000000000000000000",
+      "quorumPercent": "4",
+      "quorumAbsoluteMin": "100000000000000000000000",
+      "timelockDelay": "172800",
+      "rewardEligibilityDelay": "3600"
+    }
+  },
+  "txs": {
+    "deploy_SuperionStakingV2": "0x77d78ea7c48c7f7ede44ca944c495dcf33a5ee0104c6678db59f4287dde05af5",
+    "deploy_SuperionTimelock": "0xd216cd57f93838de4c87ba15d996043023e3bd447ecb676d62b9f2a0a18c5a8f",
+    "deploy_SuperionGovernor": "0xe883049f6455ae7a61ccb5a2512a17683d9a6ddfe50ed9044c25110dad24125a",
+    "deploy_SuperionJobMarketplaceV2": "0xb08c662a1d9b702c4a92e9f142c41615aff05bd6ef6c3b75cc96b60e7aa1482d",
+    "tl_grant_proposer_governor": "0xffe1215bcfe13ef76823ca040b8768415607fc421555545c4951cff12bb28eab",
+    "tl_grant_canceller_governor": "0x029313f7cc5d627214d9c2d5a408e280e4db83e1e1cc2ec46f57599b9b46d575",
+    "tl_grant_canceller_guardian": "0xdbe42f338bb80f850014ea3752cb2aef1d8abfadd799a707d5ef537a6a951d53",
+    "st_grant_operator_market": "0xbb924fb2fa2c8bf8c99c20bd2faeef27d453da9b33fa7b8e7db2b66cbebfc9c4",
+    "st_grant_admin_timelock": "0xc5ecef2209c99f0d2248aef30279837b6eba583d4430c2628b3803ba89c7d1d1",
+    "st_renounce_admin_deployer": "0x869c7760d253fa81b0420df75876349eb231fcde662640a29b6c431d60a9ecc6",
+    "tl_renounce_admin_deployer": "0x276cb09dbcb41841858a79a2460a068fa8d8c2d93cce5823177934a8cd03ccef"
+  },
+  "constructorArgs": {
+    "stakingV2": [
+      "0x212EE291056C673283BF441d861CA8EF696cC422",
+      "0xE60322A5543C2bAD26115053B586d9679F4A939f",
+      3600
+    ],
+    "timelock": [
+      172800,
+      [],
+      [
+        "0x0000000000000000000000000000000000000000"
+      ],
+      "0xE60322A5543C2bAD26115053B586d9679F4A939f"
+    ],
+    "governor": [
+      "0x92D9287B2aE16630d1b3b0fca26Aa0f09c957528",
+      "0x1E2deB77C9A50F064b97f8C90Facc91c4D081151",
+      86400,
+      432000,
+      "100000000000000000000000",
+      4,
+      "100000000000000000000000"
+    ],
+    "marketplaceV2": [
+      "0x212EE291056C673283BF441d861CA8EF696cC422",
+      "0x92D9287B2aE16630d1b3b0fca26Aa0f09c957528",
+      "0x1E2deB77C9A50F064b97f8C90Facc91c4D081151",
+      "0xB633ae886bbb0939E0cB7130be0D367CED9f87D4",
+      "0x1E2deB77C9A50F064b97f8C90Facc91c4D081151",
+      {
+        "feeBps": 0,
+        "burnShareBps": 5000,
+        "challengePeriod": 3600,
+        "seedRevealDelay": 60,
+        "seedRevealWindow": 180,
+        "voteCommitWindow": 150,
+        "voteRevealWindow": 150,
+        "arbitrationWindow": 3600,
+        "committeeSize": 3,
+        "providerStakeBps": 10000,
+        "slashVerifierBps": 2000,
+        "slashChallengerBps": 1000,
+        "minVerifierStake": "1000000000000000000000",
+        "verifierPenalty": "100000000000000000000",
+        "challengeBond": "25000000000000000000"
+      }
+    ]
+  },
+  "v1": {
+    "staking": "0x38e72DBb8F0B60d1162E382EE77C4d524b05F060",
+    "marketplace": "0xd5E3a1Dad8955CF5CaDe45767FF4FC5CEA21E254"
+  },
+  "safe": "0xB633ae886bbb0939E0cB7130be0D367CED9f87D4"
+}

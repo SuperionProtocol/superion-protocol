@@ -1,0 +1,27 @@
+{
+  "name": "superion",
+  "version": "1.0.0",
+  "description": "Superion Protocol — verified-work marketplace on Base",
+  "scripts": {
+    "test": "hardhat test",
+    "compile": "hardhat compile",
+    "lint": "solhint \"contracts/**/*.sol\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.6.1",
+    "@safe-global/api-kit": "^5.0.3",
+    "@safe-global/protocol-kit": "^8.0.7",
+    "@safe-global/types-kit": "^4.0.1"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^6.1.2",
+    "@nomicfoundation/hardhat-verify": "^2.1.3",
+    "@openzeppelin/merkle-tree": "^1.0.8",
+    "dotenv": "^18.0.4",
+    "hardhat": "^2.29.1",
+    "solhint": "^6.2.4"
+  }
+}

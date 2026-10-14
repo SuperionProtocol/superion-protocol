@@ -1,0 +1,162 @@
+{
+  "network": "baseSepolia",
+  "chainId": 84532,
+  "signer": "0xE60322A5543C2bAD26115053B586d9679F4A939f",
+  "limitation": "single provider wallet only; admin is both creator and provider, so the payout winner address is always the admin",
+  "note": "First invocation hit a lagging public RPC read and left jobs 4-6 mid-flow. Second invocation of the same script resumed without recreating jobs. All receipts below are status=1.",
+  "before": {
+    "stake": "1101",
+    "superBalance": "999998888",
+    "marketplaceSuper": "1",
+    "nextJobId": "2"
+  },
+  "after": {
+    "stake": "1085",
+    "superBalance": "999998889",
+    "marketplaceSuper": "0",
+    "nextJobId": "7"
+  },
+  "superDelta": "+1 (job 1's pre-escrowed 1 SUPER returned; the 19 newly escrowed SUPER were paid back to the same wallet)",
+  "stakeDeltaTotal": "-16 (8+5+3)",
+  "approve": "0x93acab5a875ce7ac151c94b3fdc9ec858ff460360d74cd709b1f7cd0b08b0b82",
+  "created": [
+    {
+      "jobId": "2",
+      "budget": "8",
+      "hash": "0xa6d9dc376ff3cfbee3a8cce8c6da5b86f444d82722a160f4d35d10e233c9d369"
+    },
+    {
+      "jobId": "3",
+      "budget": "5",
+      "hash": "0x95c8d5b4eab338161ad604e7b5907d74962a4cac2dae3ab818aea6ba8ff6d572"
+    },
+    {
+      "jobId": "4",
+      "budget": "3",
+      "hash": "0x7de76def7c843a601d83609c20ba40c6cf2131729ba665120176c2750974b828"
+    },
+    {
+      "jobId": "5",
+      "budget": "2",
+      "hash": "0xd69d190dc55edab5da8d18373a0b81f37a37b5fb3da8c0156beea7114318cee9"
+    },
+    {
+      "jobId": "6",
+      "budget": "1",
+      "hash": "0xd5e4300e6075439f61b4e2d5431fd3cbc3104146d29aaca461d617ac189aeb73"
+    }
+  ],
+  "assign": [
+    {
+      "jobId": "2",
+      "hash": "0xd9c6305874ed6f98d04260a9941ebf0ce0904e3f947eb1269f2ef05067eac899"
+    },
+    {
+      "jobId": "3",
+      "hash": "0x7dbb02e5356f791def243e23f425472f718e6b4e38e44c55f31702f45a0ec19d"
+    },
+    {
+      "jobId": "4",
+      "hash": "0xb680f2fc3d4a4f6a8ce687ee7b25eabffd74f927ae4315d56c86cb9a0e4b2fbb"
+    },
+    {
+      "jobId": "5",
+      "hash": "0x1e29d578570dafaa37b38934f32ccdcb1f0f5882ec10f2027cec47a672d491f9"
+    },
+    {
+      "jobId": "6",
+      "hash": "0x11595254d3188b79004657100dfa278ddf2c1d4e5423b6f0019aecf3c046cc38"
+    }
+  ],
+  "submit": [
+    {
+      "jobId": "1",
+      "hash": "0x17cbcb1273f6c9ae879d8a6458dd2f40bfb85b51a7b68bf89851a96f3b89c927"
+    },
+    {
+      "jobId": "2",
+      "hash": "0xdf04b7d44a2cee6d56db8efcd6e32c9f3cd601daf3ada6456fe08d67860083fc"
+    },
+    {
+      "jobId": "3",
+      "hash": "0xd84a5ebe1a572066212dcec2c0abfbe9d14d2f50914dfbdf8c9decf61db0c3e6"
+    },
+    {
+      "jobId": "4",
+      "hash": "0xaff99605fc57ba6ca8347b2adf473b0ba7800065aec8c873f86ad509c9728028"
+    },
+    {
+      "jobId": "5",
+      "hash": "0xa330edf5bcf42c08aa935462aae77ae7851ceadbc6f01f2e3454aee130201ba9"
+    },
+    {
+      "jobId": "6",
+      "hash": "0x608419f358040fdf8fc8de44d0d9ca4baa99909f0688e772cbca988da8ab86b0"
+    }
+  ],
+  "finalize": [
+    {
+      "jobId": "1",
+      "budget": "1",
+      "providerWins": true,
+      "winner": "0xE60322A5543C2bAD26115053B586d9679F4A939f",
+      "slashFired": false,
+      "slashAmount": "0",
+      "hash": "0x03e85ab705ed6e6db32625a2424cc3fc9e93f4196058a792d2e1bf9a9938950f",
+      "stakeNote": "unchanged at the post-slash level"
+    },
+    {
+      "jobId": "2",
+      "budget": "8",
+      "providerWins": false,
+      "winner": "0xE60322A5543C2bAD26115053B586d9679F4A939f",
+      "slashFired": true,
+      "slashAmount": "8",
+      "hash": "0x5fb1ad322d0aad0635d1379cc0e182884568cda30ecefed9d816fb0054228965",
+      "stakeBeforeSeries": "1101"
+    },
+    {
+      "jobId": "3",
+      "budget": "5",
+      "providerWins": false,
+      "winner": "0xE60322A5543C2bAD26115053B586d9679F4A939f",
+      "slashFired": true,
+      "slashAmount": "5",
+      "hash": "0x7d584668da6443db1f3276da075d103bf28ff01ac38a72974ee7ca85b50f94cc",
+      "stakeAfterJobs2and3": "1088"
+    },
+    {
+      "jobId": "4",
+      "budget": "3",
+      "providerWins": false,
+      "winner": "0xE60322A5543C2bAD26115053B586d9679F4A939f",
+      "slashFired": true,
+      "slashAmount": "3",
+      "hash": "0x963577ae2dd4170becb2b23ca17d01b1c8d0c0df237caa417a000f7e304eb9fc",
+      "stakeBefore": "1088",
+      "stakeAfter": "1085"
+    },
+    {
+      "jobId": "5",
+      "budget": "2",
+      "providerWins": true,
+      "winner": "0xE60322A5543C2bAD26115053B586d9679F4A939f",
+      "slashFired": false,
+      "slashAmount": "0",
+      "hash": "0x0ffee610e4b3b9bd3321cc9b06132507dc20086c116341da1466c103e310c3f9",
+      "stakeBefore": "1085",
+      "stakeAfter": "1085"
+    },
+    {
+      "jobId": "6",
+      "budget": "1",
+      "providerWins": true,
+      "winner": "0xE60322A5543C2bAD26115053B586d9679F4A939f",
+      "slashFired": false,
+      "slashAmount": "0",
+      "hash": "0x24f501e232bce3909940e9f75b5d7738fee22d9cee6439e3771168965a5bb969",
+      "stakeBefore": "1085",
+      "stakeAfter": "1085"
+    }
+  ]
+}
