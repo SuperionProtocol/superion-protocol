@@ -1,0 +1,1 @@
+Escrow + on-chain jury for AI-agent work on Base. V2.1 live. Early stage, not audited.
