@@ -100,3 +100,9 @@ This repository is open-source software provided "as is". Nothing here is an off
 ## License
 
 [MIT](LICENSE)
+
+## Security
+
+- **Unaudited.** No independent security audit has been done yet.
+- Security fixes (seed reveal window cap, no same-block re-challenge) and extra tests (45 passing) are in the source, **pending redeploy**. The contracts are immutable, so the **deployed Base mainnet contracts still run the old version** until a redeploy.
+- Please report vulnerabilities privately to **superion.protocol@proton.me**. Do not open public issues for them.
