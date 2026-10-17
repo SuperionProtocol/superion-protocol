@@ -39,6 +39,10 @@ contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable {
     uint256 public constant MAX_JOB_DURATION = 365 days;
     uint256 public constant MIN_CHALLENGE_BOND = 1 ether / 1000; // 0.001 SUPER (anti-spam)
     uint256 public constant MAX_CHALLENGE_BOND = 1_000_000 ether;
+    /// @dev HARDENING-01 : blockhash() n'est disponible que pour les 256 derniers blocs (~512 s sur Base).
+    ///      Au-delà, l'ancien code retombait sur blockhash(block.number - 1), que le contestataire
+    ///      peut choisir en retardant sa révélation (manipulation du comité). On plafonne la fenêtre.
+    uint256 public constant MAX_SEED_REVEAL_WINDOW = 8 minutes;
 
     ISuperToken public immutable superToken;
     IStakingV2 public immutable staking;
@@ -140,7 +144,6 @@ contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable {
     error TooLate();
     error VerifierCapReached();
     error BadCommit();
-    error AlreadyCommitted();
 
     constructor(address _superToken, address _staking, address admin, address pauser, address arbiter, Params memory p) {
         superToken = ISuperToken(_superToken);
@@ -166,8 +169,8 @@ contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable {
         if (
             p.feeBps > MAX_FEE_BPS || p.burnShareBps > BPS
                 || p.challengePeriod < 1 minutes || p.challengePeriod > 7 days
-                || p.seedRevealDelay < 30 seconds || p.seedRevealDelay > 1 days
-                || p.seedRevealWindow < p.seedRevealDelay || p.seedRevealWindow > 7 days
+                || p.seedRevealDelay < 30 seconds
+                || p.seedRevealWindow < p.seedRevealDelay || p.seedRevealWindow > MAX_SEED_REVEAL_WINDOW
                 || p.voteCommitWindow < 1 minutes || p.voteCommitWindow > 7 days
                 || p.voteRevealWindow < 1 minutes || p.voteRevealWindow > 7 days
                 || p.arbitrationWindow < 1 hours || p.arbitrationWindow > 30 days
@@ -331,7 +334,8 @@ contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable {
         if (keccak256(abi.encode(seed)) != d.seedCommit) revert BadCommit();
 
         bytes32 bh = blockhash(uint256(d.commitBlock) + 1);
-        if (bh == bytes32(0)) bh = blockhash(block.number - 1);
+        // HARDENING-01 : plus de repli manipulable sur blockhash(block.number - 1).
+        if (bh == bytes32(0)) revert TooLate();
         uint256 n = verifierList.length;
         uint256 k = params.committeeSize;
         uint256 minStake = params.minVerifierStake;
@@ -365,7 +369,9 @@ contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable {
         uint256 bond = d.bond;
         d.bond = 0;
         j.status = Status.Completed;
-        j.challengeDeadline = uint64(block.timestamp); // finalisable immédiatement
+        // HARDENING-02 : -1 pour qu'une nouvelle contestation dans le même bloc soit impossible
+        // (finalizeJob exige timestamp > challengeDeadline, challengeJob exige timestamp <= challengeDeadline).
+        j.challengeDeadline = uint64(block.timestamp - 1); // finalisable immédiatement
         _burn(bond);
         emit ChallengeExpired(jobId, d.challenger, bond);
     }

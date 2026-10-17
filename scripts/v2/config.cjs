@@ -26,8 +26,9 @@ const MARKETPLACE_PARAMS_TESTNET = {
 const MARKETPLACE_PARAMS_MAINNET_PROPOSAL = {
   ...MARKETPLACE_PARAMS_TESTNET,
   challengePeriod: DAY,
-  seedRevealDelay: 3600,
-  seedRevealWindow: 4 * 3600,
+  // HARDENING-01 : fenêtre de révélation du seed plafonnée à 8 min (limite blockhash 256 blocs).
+  seedRevealDelay: 60,
+  seedRevealWindow: 180,
   voteCommitWindow: DAY,
   voteRevealWindow: DAY,
   arbitrationWindow: 7 * DAY,
