@@ -292,6 +292,8 @@ describe("Hardening — fuzz / invariants (PRNG reproductible)", function () {
       const path = pick(r, 5);
       if (path === 0) { await f.market.connect(f.creator).cancelJob(id); }
       else {
+        const av = await f.staking.availableStake(f.provider.address);
+        if (av < S(budget)) { await f.token.transfer(f.provider.address, S(budget)); await f.staking.connect(f.provider).stake(S(budget)); }
         await f.market.connect(f.provider).assignJob(id);
         if (path === 1) { await time.increase(3601); await f.market.connect(f.creator).reclaimExpired(id); }
         else {
