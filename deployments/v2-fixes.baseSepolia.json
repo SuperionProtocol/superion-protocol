@@ -1,0 +1,100 @@
+{
+  "version": "2.1-fixes",
+  "network": "baseSepolia",
+  "chainId": 84532,
+  "deployedAt": "2026-10-19T21:45:26.431Z",
+  "deployer": "0xE60322A5543C2bAD26115053B586d9679F4A939f",
+  "superToken": "0xf5a6F83CE27692A247C3B2d1b7e0a3C3234300b4",
+  "note": "Core only — pas de redistribution token (vestings V2 inchangés). Admin=Timelock, gardien=deployer (PAUSER+CANCELLER).",
+  "contracts": {
+    "stakingV2": "0x417557c348892095B950E4403e2B4d15280bcd5f",
+    "timelock": "0x684F54EF5de6385011c4944Ad85f1c55a0be9E0d",
+    "governor": "0xf55E4b9AB5fDb48EA06Ca857a0907C7c9a717C5c",
+    "marketplaceV2": "0xf54140bcb638D8bf4EA345b243CbDfdB51CedDf7"
+  },
+  "params": {
+    "marketplace": {
+      "feeBps": "250",
+      "burnShareBps": "5000",
+      "challengePeriod": "180",
+      "seedRevealDelay": "60",
+      "seedRevealWindow": "180",
+      "voteCommitWindow": "150",
+      "voteRevealWindow": "150",
+      "arbitrationWindow": "3600",
+      "committeeSize": "3",
+      "providerStakeBps": "10000",
+      "slashVerifierBps": "2000",
+      "slashChallengerBps": "1000",
+      "minVerifierStake": "1000000000000000000000",
+      "verifierPenalty": "100000000000000000000",
+      "challengeBond": "25000000000000000000"
+    },
+    "governance": {
+      "votingDelay": "60",
+      "votingPeriod": "600",
+      "proposalThreshold": "1000000000000000000000",
+      "quorumPercent": "4",
+      "quorumAbsoluteMin": "1000000000000000000000",
+      "timelockDelay": "300",
+      "rewardEligibilityDelay": "60"
+    }
+  },
+  "txs": {
+    "tl_renounce_admin_deployer": "0x054541cb59caf72865d9fbe6992354b64ed283646dc50b12de17a8bb25214a42"
+  },
+  "constructorArgs": {
+    "stakingV2": [
+      "0xf5a6F83CE27692A247C3B2d1b7e0a3C3234300b4",
+      "0xE60322A5543C2bAD26115053B586d9679F4A939f",
+      60
+    ],
+    "timelock": [
+      300,
+      [],
+      [
+        "0x0000000000000000000000000000000000000000"
+      ],
+      "0xE60322A5543C2bAD26115053B586d9679F4A939f"
+    ],
+    "governor": [
+      "0x417557c348892095B950E4403e2B4d15280bcd5f",
+      "0x684F54EF5de6385011c4944Ad85f1c55a0be9E0d",
+      60,
+      600,
+      "1000000000000000000000",
+      4,
+      "1000000000000000000000"
+    ],
+    "marketplaceV2": [
+      "0xf5a6F83CE27692A247C3B2d1b7e0a3C3234300b4",
+      "0x417557c348892095B950E4403e2B4d15280bcd5f",
+      "0x684F54EF5de6385011c4944Ad85f1c55a0be9E0d",
+      "0xE60322A5543C2bAD26115053B586d9679F4A939f",
+      "0x684F54EF5de6385011c4944Ad85f1c55a0be9E0d",
+      {
+        "feeBps": 250,
+        "burnShareBps": 5000,
+        "challengePeriod": 180,
+        "seedRevealDelay": 60,
+        "seedRevealWindow": 180,
+        "voteCommitWindow": 150,
+        "voteRevealWindow": 150,
+        "arbitrationWindow": 3600,
+        "committeeSize": 3,
+        "providerStakeBps": 10000,
+        "slashVerifierBps": 2000,
+        "slashChallengerBps": 1000,
+        "minVerifierStake": "1000000000000000000000",
+        "verifierPenalty": "100000000000000000000",
+        "challengeBond": "25000000000000000000"
+      }
+    ]
+  },
+  "previousV2": {
+    "stakingV2": "0x3BB43582ABca413d43a21F0E83C03FB242d6A2d2",
+    "timelock": "0xa47Cd880622E1B39b63BCE1f96CC4e095428910a",
+    "governor": "0x878042F1fbcCe748eCEe3C8222aF5634f4391BEf",
+    "marketplaceV2": "0xd389dE5c46BB9957A5FAf628fa637c2dF3A07962"
+  }
+}

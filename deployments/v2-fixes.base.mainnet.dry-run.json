@@ -1,0 +1,58 @@
+{
+  "dryRun": true,
+  "version": "2.1",
+  "network": "base-mainnet-prep",
+  "targetChainId": 8453,
+  "simulatedChainId": 31337,
+  "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "superToken": "0x212EE291056C673283BF441d861CA8EF696cC422",
+  "simulatedSuperToken": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+  "guardian": "0xB633ae886bbb0939E0cB7130be0D367CED9f87D4",
+  "note": "DRY-RUN — pas de broadcast mainnet. feeBps=0 au lancement (relevable par Governor). Aucun mouvement des 1B SUPER, aucun appel Safe.",
+  "contractsSimulated": {
+    "stakingV2": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+    "timelock": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+    "governor": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+    "marketplaceV2": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
+  },
+  "params": {
+    "marketplace": {
+      "feeBps": "0",
+      "burnShareBps": "5000",
+      "challengePeriod": "3600",
+      "seedRevealDelay": "60",
+      "seedRevealWindow": "180",
+      "voteCommitWindow": "150",
+      "voteRevealWindow": "150",
+      "arbitrationWindow": "3600",
+      "committeeSize": "3",
+      "providerStakeBps": "10000",
+      "slashVerifierBps": "2000",
+      "slashChallengerBps": "1000",
+      "minVerifierStake": "1000000000000000000000",
+      "verifierPenalty": "100000000000000000000",
+      "challengeBond": "25000000000000000000"
+    },
+    "governance": {
+      "votingDelay": "86400",
+      "votingPeriod": "432000",
+      "proposalThreshold": "100000000000000000000000",
+      "quorumPercent": "4",
+      "quorumAbsoluteMin": "100000000000000000000000",
+      "timelockDelay": "172800",
+      "rewardEligibilityDelay": "3600"
+    }
+  },
+  "v1Reference": {
+    "staking": "0x38e72DBb8F0B60d1162E382EE77C4d524b05F060",
+    "marketplace": "0xd5E3a1Dad8955CF5CaDe45767FF4FC5CEA21E254"
+  },
+  "gasHints": {
+    "staking": null,
+    "timelock": null,
+    "governor": null,
+    "marketplace": null,
+    "sepoliaCoreMeasuredApprox": "11970000",
+    "recommendedDeployerEth": "0.003"
+  }
+}

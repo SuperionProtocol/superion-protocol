@@ -1,0 +1,426 @@
+Problem executing hardhat: ◇ injected env (0) from .env
+◇ injected env (0) from .env
+
+INFO:Detectors:
+Detector: weak-prng
+SuperionJobMarketplaceV2._draw(uint256,SuperionJobMarketplaceV2.Job,SuperionJobMarketplaceV2.Dispute,uint256,uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#456-472) uses a weak PRNG: "v = verifierList[(start + i) % n] (contracts/v2/SuperionJobMarketplaceV2.sol#464)" 
+SuperionJobMarketplaceV2._draw(uint256,SuperionJobMarketplaceV2.Job,SuperionJobMarketplaceV2.Dispute,uint256,uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#456-472) uses a weak PRNG: "start = rnd % n (contracts/v2/SuperionJobMarketplaceV2.sol#462)" 
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#weak-PRNG
+INFO:Detectors:
+Detector: divide-before-multiply
+SuperionJobMarketplaceV2._payVerifiers(uint256,uint8,uint256,uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#804-809) performs a multiplication on the result of a division:
+	- share = pool / winners (contracts/v2/SuperionJobMarketplaceV2.sol#805)
+	- pool - share * winners (contracts/v2/SuperionJobMarketplaceV2.sol#808)
+SuperionJobMarketplaceV2._payProvider(uint256,SuperionJobMarketplaceV2.Job) (contracts/v2/SuperionJobMarketplaceV2.sol#829-847) performs a multiplication on the result of a division:
+	- fee = (budget * j.feeBps) / BPS (contracts/v2/SuperionJobMarketplaceV2.sol#835)
+	- burned = (fee * j.burnShareBps) / BPS (contracts/v2/SuperionJobMarketplaceV2.sol#836)
+SuperionStakingV2._distribute(uint256) (contracts/v2/SuperionStakingV2.sol#139-150) performs a multiplication on the result of a division:
+	- increment = (pool * PRECISION) / supply (contracts/v2/SuperionStakingV2.sol#145)
+	- distributed = (increment * supply) / PRECISION (contracts/v2/SuperionStakingV2.sol#146)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#divide-before-multiply
+INFO:Detectors:
+Detector: reentrancy-no-eth
+Reentrancy in SuperionJobMarketplaceV2._penalize(uint256,address,uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#818-827):
+	External calls:
+	- staking.slash(v,p) (contracts/v2/SuperionJobMarketplaceV2.sol#824)
+	State variables written after the call(s):
+	- _removeFromList(v) (contracts/v2/SuperionJobMarketplaceV2.sol#826)
+		- verifiers[moved].indexPlus1 = uint32(idx + 1) (contracts/v2/SuperionJobMarketplaceV2.sol#311)
+		- v.indexPlus1 = 0 (contracts/v2/SuperionJobMarketplaceV2.sol#314)
+	SuperionJobMarketplaceV2.verifiers (contracts/v2/SuperionJobMarketplaceV2.sol#144) can be used in cross function reentrancies:
+	- SuperionJobMarketplaceV2.verifiers (contracts/v2/SuperionJobMarketplaceV2.sol#144)
+Reentrancy in SuperionJobMarketplaceV2._settle(uint256,SuperionJobMarketplaceV2.Job,bool,bool) (contracts/v2/SuperionJobMarketplaceV2.sol#733-786):
+	External calls:
+	- (winners,toBurn) = _settleCommittee(jobId,_committees[jobId],winningVote,d.verifierPenalty) (contracts/v2/SuperionJobMarketplaceV2.sol#739)
+		- staking.slash(v,p) (contracts/v2/SuperionJobMarketplaceV2.sol#824)
+	- (w2,b2) = _settleCommittee(jobId,_firstCommittees[jobId],winningVote,d.verifierPenalty) (contracts/v2/SuperionJobMarketplaceV2.sol#741)
+		- staking.slash(v,p) (contracts/v2/SuperionJobMarketplaceV2.sol#824)
+	State variables written after the call(s):
+	- x.appealBond = 0 (contracts/v2/SuperionJobMarketplaceV2.sol#753)
+	SuperionJobMarketplaceV2.disputeExt (contracts/v2/SuperionJobMarketplaceV2.sol#93) can be used in cross function reentrancies:
+	- SuperionJobMarketplaceV2.disputeExt (contracts/v2/SuperionJobMarketplaceV2.sol#93)
+	- SuperionJobMarketplaceV2.freezeDispute(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#564-570)
+	- SuperionJobMarketplaceV2.unfreezeDispute(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#572-576)
+	- d.bond = 0 (contracts/v2/SuperionJobMarketplaceV2.sol#747)
+	SuperionJobMarketplaceV2.disputes (contracts/v2/SuperionJobMarketplaceV2.sol#138) can be used in cross function reentrancies:
+	- SuperionJobMarketplaceV2.appealBondFor(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#262-267)
+	- SuperionJobMarketplaceV2.commitVote(uint256,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#610-620)
+	- SuperionJobMarketplaceV2.disputes (contracts/v2/SuperionJobMarketplaceV2.sol#138)
+	- SuperionJobMarketplaceV2.majorityOf(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#641-649)
+	- SuperionJobMarketplaceV2.revealVote(uint256,bool,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#622-639)
+	- (w2,b2) = _settleCommittee(jobId,_firstCommittees[jobId],winningVote,d.verifierPenalty) (contracts/v2/SuperionJobMarketplaceV2.sol#741)
+		- verifierList[idx] = moved (contracts/v2/SuperionJobMarketplaceV2.sol#310)
+		- verifierList.pop() (contracts/v2/SuperionJobMarketplaceV2.sol#313)
+	SuperionJobMarketplaceV2.verifierList (contracts/v2/SuperionJobMarketplaceV2.sol#145) can be used in cross function reentrancies:
+	- SuperionJobMarketplaceV2.verifierCount() (contracts/v2/SuperionJobMarketplaceV2.sol#251)
+	- SuperionJobMarketplaceV2.verifierList (contracts/v2/SuperionJobMarketplaceV2.sol#145)
+	- (w2,b2) = _settleCommittee(jobId,_firstCommittees[jobId],winningVote,d.verifierPenalty) (contracts/v2/SuperionJobMarketplaceV2.sol#741)
+		- verifiers[v].duties -= 1 (contracts/v2/SuperionJobMarketplaceV2.sol#793)
+		- verifiers[moved].indexPlus1 = uint32(idx + 1) (contracts/v2/SuperionJobMarketplaceV2.sol#311)
+		- info.bond -= p (contracts/v2/SuperionJobMarketplaceV2.sol#823)
+		- v.indexPlus1 = 0 (contracts/v2/SuperionJobMarketplaceV2.sol#314)
+	SuperionJobMarketplaceV2.verifiers (contracts/v2/SuperionJobMarketplaceV2.sol#144) can be used in cross function reentrancies:
+	- SuperionJobMarketplaceV2.verifiers (contracts/v2/SuperionJobMarketplaceV2.sol#144)
+Reentrancy in SuperionJobMarketplaceV2._settle(uint256,SuperionJobMarketplaceV2.Job,bool,bool) (contracts/v2/SuperionJobMarketplaceV2.sol#733-786):
+	External calls:
+	- (winners,toBurn) = _settleCommittee(jobId,_committees[jobId],winningVote,d.verifierPenalty) (contracts/v2/SuperionJobMarketplaceV2.sol#739)
+		- staking.slash(v,p) (contracts/v2/SuperionJobMarketplaceV2.sol#824)
+	- (w2,b2) = _settleCommittee(jobId,_firstCommittees[jobId],winningVote,d.verifierPenalty) (contracts/v2/SuperionJobMarketplaceV2.sol#741)
+		- staking.slash(v,p) (contracts/v2/SuperionJobMarketplaceV2.sol#824)
+	- staking.slash(j.provider,slashAmt) (contracts/v2/SuperionJobMarketplaceV2.sol#771)
+	State variables written after the call(s):
+	- _refundCreator(jobId,j) (contracts/v2/SuperionJobMarketplaceV2.sol#781)
+		- j.budget = 0 (contracts/v2/SuperionJobMarketplaceV2.sol#859)
+		- j.status = Status.Refunded (contracts/v2/SuperionJobMarketplaceV2.sol#860)
+	SuperionJobMarketplaceV2.jobs (contracts/v2/SuperionJobMarketplaceV2.sol#137) can be used in cross function reentrancies:
+	- SuperionJobMarketplaceV2.appealBondFor(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#262-267)
+	- SuperionJobMarketplaceV2.commitVote(uint256,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#610-620)
+	- SuperionJobMarketplaceV2.freezeDispute(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#564-570)
+	- SuperionJobMarketplaceV2.jobs (contracts/v2/SuperionJobMarketplaceV2.sol#137)
+	- SuperionJobMarketplaceV2.revealVote(uint256,bool,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#622-639)
+	- SuperionJobMarketplaceV2.submitResult(uint256,string) (contracts/v2/SuperionJobMarketplaceV2.sol#345-354)
+Reentrancy in SuperionJobMarketplaceV2._settleCommittee(uint256,address[],uint8,uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#788-802):
+	External calls:
+	- toBurn += _penalize(jobId,v,penalty) (contracts/v2/SuperionJobMarketplaceV2.sol#799)
+		- staking.slash(v,p) (contracts/v2/SuperionJobMarketplaceV2.sol#824)
+	State variables written after the call(s):
+	- verifiers[v].duties -= 1 (contracts/v2/SuperionJobMarketplaceV2.sol#793)
+	SuperionJobMarketplaceV2.verifiers (contracts/v2/SuperionJobMarketplaceV2.sol#144) can be used in cross function reentrancies:
+	- SuperionJobMarketplaceV2.verifiers (contracts/v2/SuperionJobMarketplaceV2.sol#144)
+Reentrancy in SuperionJobMarketplaceV2.assignJob(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#334-343):
+	External calls:
+	- staking.lock(msg.sender,lockAmt) (contracts/v2/SuperionJobMarketplaceV2.sol#338)
+	State variables written after the call(s):
+	- j.provider = msg.sender (contracts/v2/SuperionJobMarketplaceV2.sol#339)
+	SuperionJobMarketplaceV2.jobs (contracts/v2/SuperionJobMarketplaceV2.sol#137) can be used in cross function reentrancies:
+	- SuperionJobMarketplaceV2.appealBondFor(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#262-267)
+	- SuperionJobMarketplaceV2.commitVote(uint256,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#610-620)
+	- SuperionJobMarketplaceV2.freezeDispute(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#564-570)
+	- SuperionJobMarketplaceV2.jobs (contracts/v2/SuperionJobMarketplaceV2.sol#137)
+	- SuperionJobMarketplaceV2.revealVote(uint256,bool,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#622-639)
+	- SuperionJobMarketplaceV2.submitResult(uint256,string) (contracts/v2/SuperionJobMarketplaceV2.sol#345-354)
+	- j.lockedStake = lockAmt (contracts/v2/SuperionJobMarketplaceV2.sol#340)
+	SuperionJobMarketplaceV2.jobs (contracts/v2/SuperionJobMarketplaceV2.sol#137) can be used in cross function reentrancies:
+	- SuperionJobMarketplaceV2.appealBondFor(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#262-267)
+	- SuperionJobMarketplaceV2.commitVote(uint256,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#610-620)
+	- SuperionJobMarketplaceV2.freezeDispute(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#564-570)
+	- SuperionJobMarketplaceV2.jobs (contracts/v2/SuperionJobMarketplaceV2.sol#137)
+	- SuperionJobMarketplaceV2.revealVote(uint256,bool,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#622-639)
+	- SuperionJobMarketplaceV2.submitResult(uint256,string) (contracts/v2/SuperionJobMarketplaceV2.sol#345-354)
+	- j.status = Status.Assigned (contracts/v2/SuperionJobMarketplaceV2.sol#341)
+	SuperionJobMarketplaceV2.jobs (contracts/v2/SuperionJobMarketplaceV2.sol#137) can be used in cross function reentrancies:
+	- SuperionJobMarketplaceV2.appealBondFor(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#262-267)
+	- SuperionJobMarketplaceV2.commitVote(uint256,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#610-620)
+	- SuperionJobMarketplaceV2.freezeDispute(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#564-570)
+	- SuperionJobMarketplaceV2.jobs (contracts/v2/SuperionJobMarketplaceV2.sol#137)
+	- SuperionJobMarketplaceV2.revealVote(uint256,bool,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#622-639)
+	- SuperionJobMarketplaceV2.submitResult(uint256,string) (contracts/v2/SuperionJobMarketplaceV2.sol#345-354)
+Reentrancy in SuperionJobMarketplaceV2.increaseVerifierBond(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#270-276):
+	External calls:
+	- staking.lock(msg.sender,amount) (contracts/v2/SuperionJobMarketplaceV2.sol#273)
+	State variables written after the call(s):
+	- v.bond += amount (contracts/v2/SuperionJobMarketplaceV2.sol#274)
+	SuperionJobMarketplaceV2.verifiers (contracts/v2/SuperionJobMarketplaceV2.sol#144) can be used in cross function reentrancies:
+	- SuperionJobMarketplaceV2.verifiers (contracts/v2/SuperionJobMarketplaceV2.sol#144)
+Reentrancy in SuperionJobMarketplaceV2.reclaimExpired(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#374-380):
+	External calls:
+	- _unlockProvider(j) (contracts/v2/SuperionJobMarketplaceV2.sol#378)
+		- staking.unlock(j.provider,amt) (contracts/v2/SuperionJobMarketplaceV2.sol#853)
+	State variables written after the call(s):
+	- _refundCreator(jobId,j) (contracts/v2/SuperionJobMarketplaceV2.sol#379)
+		- j.budget = 0 (contracts/v2/SuperionJobMarketplaceV2.sol#859)
+		- j.status = Status.Refunded (contracts/v2/SuperionJobMarketplaceV2.sol#860)
+	SuperionJobMarketplaceV2.jobs (contracts/v2/SuperionJobMarketplaceV2.sol#137) can be used in cross function reentrancies:
+	- SuperionJobMarketplaceV2.appealBondFor(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#262-267)
+	- SuperionJobMarketplaceV2.commitVote(uint256,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#610-620)
+	- SuperionJobMarketplaceV2.freezeDispute(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#564-570)
+	- SuperionJobMarketplaceV2.jobs (contracts/v2/SuperionJobMarketplaceV2.sol#137)
+	- SuperionJobMarketplaceV2.revealVote(uint256,bool,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#622-639)
+	- SuperionJobMarketplaceV2.submitResult(uint256,string) (contracts/v2/SuperionJobMarketplaceV2.sol#345-354)
+Reentrancy in SuperionJobMarketplaceV2.registerVerifier() (contracts/v2/SuperionJobMarketplaceV2.sol#278-288):
+	External calls:
+	- staking.lock(msg.sender,bond) (contracts/v2/SuperionJobMarketplaceV2.sol#283)
+	State variables written after the call(s):
+	- verifierList.push(msg.sender) (contracts/v2/SuperionJobMarketplaceV2.sol#285)
+	SuperionJobMarketplaceV2.verifierList (contracts/v2/SuperionJobMarketplaceV2.sol#145) can be used in cross function reentrancies:
+	- SuperionJobMarketplaceV2.verifierCount() (contracts/v2/SuperionJobMarketplaceV2.sol#251)
+	- SuperionJobMarketplaceV2.verifierList (contracts/v2/SuperionJobMarketplaceV2.sol#145)
+	- v.bond = bond (contracts/v2/SuperionJobMarketplaceV2.sol#284)
+	SuperionJobMarketplaceV2.verifiers (contracts/v2/SuperionJobMarketplaceV2.sol#144) can be used in cross function reentrancies:
+	- SuperionJobMarketplaceV2.verifiers (contracts/v2/SuperionJobMarketplaceV2.sol#144)
+	- v.indexPlus1 = uint32(verifierList.length) (contracts/v2/SuperionJobMarketplaceV2.sol#286)
+	SuperionJobMarketplaceV2.verifiers (contracts/v2/SuperionJobMarketplaceV2.sol#144) can be used in cross function reentrancies:
+	- SuperionJobMarketplaceV2.verifiers (contracts/v2/SuperionJobMarketplaceV2.sol#144)
+Reentrancy in SuperionJobMarketplaceV2.rerollNonRevealers(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#477-521):
+	External calls:
+	- toBurn += _penalize(jobId,v,d.verifierPenalty) (contracts/v2/SuperionJobMarketplaceV2.sol#500)
+		- staking.slash(v,p) (contracts/v2/SuperionJobMarketplaceV2.sol#824)
+	State variables written after the call(s):
+	- x.rerolls += 1 (contracts/v2/SuperionJobMarketplaceV2.sol#511)
+	SuperionJobMarketplaceV2.disputeExt (contracts/v2/SuperionJobMarketplaceV2.sol#93) can be used in cross function reentrancies:
+	- SuperionJobMarketplaceV2.disputeExt (contracts/v2/SuperionJobMarketplaceV2.sol#93)
+	- SuperionJobMarketplaceV2.freezeDispute(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#564-570)
+	- SuperionJobMarketplaceV2.unfreezeDispute(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#572-576)
+	- d.voteCommitDeadline = uint64(block.timestamp + p.voteCommitWindow) (contracts/v2/SuperionJobMarketplaceV2.sol#517)
+	SuperionJobMarketplaceV2.disputes (contracts/v2/SuperionJobMarketplaceV2.sol#138) can be used in cross function reentrancies:
+	- SuperionJobMarketplaceV2.appealBondFor(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#262-267)
+	- SuperionJobMarketplaceV2.commitVote(uint256,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#610-620)
+	- SuperionJobMarketplaceV2.disputes (contracts/v2/SuperionJobMarketplaceV2.sol#138)
+	- SuperionJobMarketplaceV2.majorityOf(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#641-649)
+	- SuperionJobMarketplaceV2.revealVote(uint256,bool,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#622-639)
+	- j.disputeDeadline = uint64(block.timestamp + p.voteCommitWindow + p.voteRevealWindow) (contracts/v2/SuperionJobMarketplaceV2.sol#518)
+	SuperionJobMarketplaceV2.jobs (contracts/v2/SuperionJobMarketplaceV2.sol#137) can be used in cross function reentrancies:
+	- SuperionJobMarketplaceV2.appealBondFor(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#262-267)
+	- SuperionJobMarketplaceV2.commitVote(uint256,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#610-620)
+	- SuperionJobMarketplaceV2.freezeDispute(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#564-570)
+	- SuperionJobMarketplaceV2.jobs (contracts/v2/SuperionJobMarketplaceV2.sol#137)
+	- SuperionJobMarketplaceV2.revealVote(uint256,bool,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#622-639)
+	- SuperionJobMarketplaceV2.submitResult(uint256,string) (contracts/v2/SuperionJobMarketplaceV2.sol#345-354)
+	- memberVote[jobId][v] = 5 (contracts/v2/SuperionJobMarketplaceV2.sol#497)
+	SuperionJobMarketplaceV2.memberVote (contracts/v2/SuperionJobMarketplaceV2.sol#141) can be used in cross function reentrancies:
+	- SuperionJobMarketplaceV2.commitVote(uint256,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#610-620)
+	- SuperionJobMarketplaceV2.memberVote (contracts/v2/SuperionJobMarketplaceV2.sol#141)
+	- SuperionJobMarketplaceV2.revealVote(uint256,bool,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#622-639)
+	- _draw(jobId,j,d,rnd,nRemoved) (contracts/v2/SuperionJobMarketplaceV2.sol#514)
+		- memberVote[jobId][v] = 1 (contracts/v2/SuperionJobMarketplaceV2.sol#469)
+	SuperionJobMarketplaceV2.memberVote (contracts/v2/SuperionJobMarketplaceV2.sol#141) can be used in cross function reentrancies:
+	- SuperionJobMarketplaceV2.commitVote(uint256,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#610-620)
+	- SuperionJobMarketplaceV2.memberVote (contracts/v2/SuperionJobMarketplaceV2.sol#141)
+	- SuperionJobMarketplaceV2.revealVote(uint256,bool,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#622-639)
+	- verifiers[v].duties -= 1 (contracts/v2/SuperionJobMarketplaceV2.sol#498)
+	SuperionJobMarketplaceV2.verifiers (contracts/v2/SuperionJobMarketplaceV2.sol#144) can be used in cross function reentrancies:
+	- SuperionJobMarketplaceV2.verifiers (contracts/v2/SuperionJobMarketplaceV2.sol#144)
+	- _draw(jobId,j,d,rnd,nRemoved) (contracts/v2/SuperionJobMarketplaceV2.sol#514)
+		- verifiers[v].duties += 1 (contracts/v2/SuperionJobMarketplaceV2.sol#470)
+	SuperionJobMarketplaceV2.verifiers (contracts/v2/SuperionJobMarketplaceV2.sol#144) can be used in cross function reentrancies:
+	- SuperionJobMarketplaceV2.verifiers (contracts/v2/SuperionJobMarketplaceV2.sol#144)
+Reentrancy in SuperionJobMarketplaceV2.resolveStale(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#703-731):
+	External calls:
+	- toBurn += _penalize(jobId,v,d.verifierPenalty) (contracts/v2/SuperionJobMarketplaceV2.sol#723)
+		- staking.slash(v,p) (contracts/v2/SuperionJobMarketplaceV2.sol#824)
+	State variables written after the call(s):
+	- verifiers[v].duties -= 1 (contracts/v2/SuperionJobMarketplaceV2.sol#719)
+	SuperionJobMarketplaceV2.verifiers (contracts/v2/SuperionJobMarketplaceV2.sol#144) can be used in cross function reentrancies:
+	- SuperionJobMarketplaceV2.verifiers (contracts/v2/SuperionJobMarketplaceV2.sol#144)
+Reentrancy in SuperionJobMarketplaceV2.resolveStale(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#703-731):
+	External calls:
+	- toBurn += _penalize(jobId,v,d.verifierPenalty) (contracts/v2/SuperionJobMarketplaceV2.sol#723)
+		- staking.slash(v,p) (contracts/v2/SuperionJobMarketplaceV2.sol#824)
+	- _unlockProvider(j) (contracts/v2/SuperionJobMarketplaceV2.sol#725)
+		- staking.unlock(j.provider,amt) (contracts/v2/SuperionJobMarketplaceV2.sol#853)
+	State variables written after the call(s):
+	- d.bond = 0 (contracts/v2/SuperionJobMarketplaceV2.sol#727)
+	SuperionJobMarketplaceV2.disputes (contracts/v2/SuperionJobMarketplaceV2.sol#138) can be used in cross function reentrancies:
+	- SuperionJobMarketplaceV2.appealBondFor(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#262-267)
+	- SuperionJobMarketplaceV2.commitVote(uint256,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#610-620)
+	- SuperionJobMarketplaceV2.disputes (contracts/v2/SuperionJobMarketplaceV2.sol#138)
+	- SuperionJobMarketplaceV2.majorityOf(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#641-649)
+	- SuperionJobMarketplaceV2.revealVote(uint256,bool,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#622-639)
+	- _unlockProvider(j) (contracts/v2/SuperionJobMarketplaceV2.sol#725)
+		- j.lockedStake = 0 (contracts/v2/SuperionJobMarketplaceV2.sol#852)
+	SuperionJobMarketplaceV2.jobs (contracts/v2/SuperionJobMarketplaceV2.sol#137) can be used in cross function reentrancies:
+	- SuperionJobMarketplaceV2.appealBondFor(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#262-267)
+	- SuperionJobMarketplaceV2.commitVote(uint256,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#610-620)
+	- SuperionJobMarketplaceV2.freezeDispute(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#564-570)
+	- SuperionJobMarketplaceV2.jobs (contracts/v2/SuperionJobMarketplaceV2.sol#137)
+	- SuperionJobMarketplaceV2.revealVote(uint256,bool,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#622-639)
+	- SuperionJobMarketplaceV2.submitResult(uint256,string) (contracts/v2/SuperionJobMarketplaceV2.sol#345-354)
+	- _refundCreator(jobId,j) (contracts/v2/SuperionJobMarketplaceV2.sol#729)
+		- j.budget = 0 (contracts/v2/SuperionJobMarketplaceV2.sol#859)
+		- j.status = Status.Refunded (contracts/v2/SuperionJobMarketplaceV2.sol#860)
+	SuperionJobMarketplaceV2.jobs (contracts/v2/SuperionJobMarketplaceV2.sol#137) can be used in cross function reentrancies:
+	- SuperionJobMarketplaceV2.appealBondFor(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#262-267)
+	- SuperionJobMarketplaceV2.commitVote(uint256,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#610-620)
+	- SuperionJobMarketplaceV2.freezeDispute(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#564-570)
+	- SuperionJobMarketplaceV2.jobs (contracts/v2/SuperionJobMarketplaceV2.sol#137)
+	- SuperionJobMarketplaceV2.revealVote(uint256,bool,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#622-639)
+	- SuperionJobMarketplaceV2.submitResult(uint256,string) (contracts/v2/SuperionJobMarketplaceV2.sol#345-354)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-2
+INFO:Detectors:
+Detector: uninitialized-local
+SuperionJobMarketplaceV2.exitVerifier().released (contracts/v2/SuperionJobMarketplaceV2.sol#293) is a local variable never initialized
+SuperionJobMarketplaceV2.resolveStale(uint256).toBurn (contracts/v2/SuperionJobMarketplaceV2.sol#716) is a local variable never initialized
+SuperionJobMarketplaceV2._settle(uint256,SuperionJobMarketplaceV2.Job,bool,bool).verifierPool (contracts/v2/SuperionJobMarketplaceV2.sol#748) is a local variable never initialized
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#uninitialized-local-variables
+INFO:Detectors:
+Detector: calls-loop
+SuperionJobMarketplaceV2._penalize(uint256,address,uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#818-827) has external calls inside a loop: staking.slash(v,p) (contracts/v2/SuperionJobMarketplaceV2.sol#824)
+	Calls stack containing the loop:
+		SuperionJobMarketplaceV2.rerollNonRevealers(uint256)
+SuperionJobMarketplaceV2._penalize(uint256,address,uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#818-827) has external calls inside a loop: staking.slash(v,p) (contracts/v2/SuperionJobMarketplaceV2.sol#824)
+	Calls stack containing the loop:
+		SuperionJobMarketplaceV2.expireUnrevealedChallenge(uint256)
+		SuperionJobMarketplaceV2._settle(uint256,SuperionJobMarketplaceV2.Job,bool,bool)
+		SuperionJobMarketplaceV2._settleCommittee(uint256,address[],uint8,uint256)
+SuperionJobMarketplaceV2._penalize(uint256,address,uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#818-827) has external calls inside a loop: staking.slash(v,p) (contracts/v2/SuperionJobMarketplaceV2.sol#824)
+	Calls stack containing the loop:
+		SuperionJobMarketplaceV2.resolveDispute(uint256)
+		SuperionJobMarketplaceV2._settle(uint256,SuperionJobMarketplaceV2.Job,bool,bool)
+		SuperionJobMarketplaceV2._settleCommittee(uint256,address[],uint8,uint256)
+SuperionJobMarketplaceV2._penalize(uint256,address,uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#818-827) has external calls inside a loop: staking.slash(v,p) (contracts/v2/SuperionJobMarketplaceV2.sol#824)
+	Calls stack containing the loop:
+		SuperionJobMarketplaceV2.arbitrate(uint256,bool)
+		SuperionJobMarketplaceV2._settle(uint256,SuperionJobMarketplaceV2.Job,bool,bool)
+		SuperionJobMarketplaceV2._settleCommittee(uint256,address[],uint8,uint256)
+SuperionJobMarketplaceV2._penalize(uint256,address,uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#818-827) has external calls inside a loop: staking.slash(v,p) (contracts/v2/SuperionJobMarketplaceV2.sol#824)
+	Calls stack containing the loop:
+		SuperionJobMarketplaceV2.resolveStale(uint256)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation/#calls-inside-a-loop
+INFO:Detectors:
+Detector: reentrancy-benign
+Reentrancy in SuperionJobMarketplaceV2._penalize(uint256,address,uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#818-827):
+	External calls:
+	- staking.slash(v,p) (contracts/v2/SuperionJobMarketplaceV2.sol#824)
+	State variables written after the call(s):
+	- _removeFromList(v) (contracts/v2/SuperionJobMarketplaceV2.sol#826)
+		- verifierList[idx] = moved (contracts/v2/SuperionJobMarketplaceV2.sol#310)
+		- verifierList.pop() (contracts/v2/SuperionJobMarketplaceV2.sol#313)
+Reentrancy in SuperionJobMarketplaceV2._settle(uint256,SuperionJobMarketplaceV2.Job,bool,bool) (contracts/v2/SuperionJobMarketplaceV2.sol#733-786):
+	External calls:
+	- (winners,toBurn) = _settleCommittee(jobId,_committees[jobId],winningVote,d.verifierPenalty) (contracts/v2/SuperionJobMarketplaceV2.sol#739)
+		- staking.slash(v,p) (contracts/v2/SuperionJobMarketplaceV2.sol#824)
+	- (w2,b2) = _settleCommittee(jobId,_firstCommittees[jobId],winningVote,d.verifierPenalty) (contracts/v2/SuperionJobMarketplaceV2.sol#741)
+		- staking.slash(v,p) (contracts/v2/SuperionJobMarketplaceV2.sol#824)
+	State variables written after the call(s):
+	- j.lockedStake = 0 (contracts/v2/SuperionJobMarketplaceV2.sol#769)
+	- (w2,b2) = _settleCommittee(jobId,_firstCommittees[jobId],winningVote,d.verifierPenalty) (contracts/v2/SuperionJobMarketplaceV2.sol#741)
+		- lastDutyEnd[v] = uint64(block.timestamp) (contracts/v2/SuperionJobMarketplaceV2.sol#794)
+Reentrancy in SuperionJobMarketplaceV2._settleCommittee(uint256,address[],uint8,uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#788-802):
+	External calls:
+	- toBurn += _penalize(jobId,v,penalty) (contracts/v2/SuperionJobMarketplaceV2.sol#799)
+		- staking.slash(v,p) (contracts/v2/SuperionJobMarketplaceV2.sol#824)
+	State variables written after the call(s):
+	- lastDutyEnd[v] = uint64(block.timestamp) (contracts/v2/SuperionJobMarketplaceV2.sol#794)
+Reentrancy in SuperionJobMarketplaceV2.rerollNonRevealers(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#477-521):
+	External calls:
+	- toBurn += _penalize(jobId,v,d.verifierPenalty) (contracts/v2/SuperionJobMarketplaceV2.sol#500)
+		- staking.slash(v,p) (contracts/v2/SuperionJobMarketplaceV2.sol#824)
+	State variables written after the call(s):
+	- lastDutyEnd[v] = uint64(block.timestamp) (contracts/v2/SuperionJobMarketplaceV2.sol#499)
+Reentrancy in SuperionJobMarketplaceV2.resolveStale(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#703-731):
+	External calls:
+	- toBurn += _penalize(jobId,v,d.verifierPenalty) (contracts/v2/SuperionJobMarketplaceV2.sol#723)
+		- staking.slash(v,p) (contracts/v2/SuperionJobMarketplaceV2.sol#824)
+	State variables written after the call(s):
+	- lastDutyEnd[v] = uint64(block.timestamp) (contracts/v2/SuperionJobMarketplaceV2.sol#720)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-3
+INFO:Detectors:
+Detector: timestamp
+JobMarketplace.assignJob(uint256) (contracts/JobMarketplace.sol#63-70) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(job.status == JobStatus.Open && block.timestamp < job.deadline,Job not available) (contracts/JobMarketplace.sol#65)
+	- require(bool,string)(staking.getStake(msg.sender) >= job.budget,Stake below job budget) (contracts/JobMarketplace.sol#66)
+JobMarketplace.submitResult(uint256,string) (contracts/JobMarketplace.sol#72-79) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(msg.sender == job.provider && job.status == JobStatus.Assigned,Not allowed) (contracts/JobMarketplace.sol#74)
+JobMarketplace.challengeJob(uint256) (contracts/JobMarketplace.sol#81-87) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(job.status == JobStatus.Completed && block.timestamp <= job.challengeDeadline,Cannot challenge) (contracts/JobMarketplace.sol#83)
+JobMarketplace.finalizeJob(uint256,bool) (contracts/JobMarketplace.sol#89-107) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(job.status == JobStatus.Completed || job.status == JobStatus.Challenged,Cannot finalize) (contracts/JobMarketplace.sol#91)
+JobMarketplace.cancelJob(uint256) (contracts/JobMarketplace.sol#109-117) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(msg.sender == job.creator && job.status == JobStatus.Open,Cannot cancel) (contracts/JobMarketplace.sol#111)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#block-timestamp
+INFO:Detectors:
+Detector: timestamp
+Staking.requestUnstake(uint256) (contracts/Staking.sol#45-53) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(info.amount >= amount && amount > 0,Invalid amount) (contracts/Staking.sol#47)
+Staking.completeUnstake() (contracts/Staking.sol#55-63) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(info.unbondingAmount > 0,Nothing to unstake) (contracts/Staking.sol#57)
+	- require(bool,string)(block.timestamp >= info.unbondingStart + UNBONDING_PERIOD,Unbonding period not finished) (contracts/Staking.sol#58)
+Staking.slash(address,uint256,string) (contracts/Staking.sol#65-72) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(info.amount >= amount,Insufficient stake) (contracts/Staking.sol#67)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#block-timestamp
+INFO:Detectors:
+Detector: timestamp
+SuperionJobMarketplaceV2.appealBondFor(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#262-267) uses timestamp for comparisons
+	Dangerous comparisons:
+	- b < floor (contracts/v2/SuperionJobMarketplaceV2.sol#265)
+	- b < MIN_CHALLENGE_BOND (contracts/v2/SuperionJobMarketplaceV2.sol#266)
+SuperionJobMarketplaceV2.exitVerifier() (contracts/v2/SuperionJobMarketplaceV2.sol#290-302) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp < uint256(lastDutyEnd[msg.sender]) + securityParams.verifierCooldown (contracts/v2/SuperionJobMarketplaceV2.sol#296)
+SuperionJobMarketplaceV2.assignJob(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#334-343) uses timestamp for comparisons
+	Dangerous comparisons:
+	- j.status != Status.Open || block.timestamp >= j.deadline (contracts/v2/SuperionJobMarketplaceV2.sol#336)
+SuperionJobMarketplaceV2.submitResult(uint256,string) (contracts/v2/SuperionJobMarketplaceV2.sol#345-354) uses timestamp for comparisons
+	Dangerous comparisons:
+	- j.status != Status.Assigned || block.timestamp > j.deadline (contracts/v2/SuperionJobMarketplaceV2.sol#348)
+SuperionJobMarketplaceV2.finalizeJob(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#356-361) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp <= j.challengeDeadline (contracts/v2/SuperionJobMarketplaceV2.sol#359)
+SuperionJobMarketplaceV2.reclaimExpired(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#374-380) uses timestamp for comparisons
+	Dangerous comparisons:
+	- j.status != Status.Assigned || block.timestamp <= j.deadline (contracts/v2/SuperionJobMarketplaceV2.sol#377)
+SuperionJobMarketplaceV2.challengeJob(uint256,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#386-411) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp > j.challengeDeadline (contracts/v2/SuperionJobMarketplaceV2.sol#389)
+SuperionJobMarketplaceV2.revealCommittee(uint256,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#415-452) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp < d.seedRevealEarliest (contracts/v2/SuperionJobMarketplaceV2.sol#422)
+	- block.timestamp > d.seedRevealDeadline (contracts/v2/SuperionJobMarketplaceV2.sol#423)
+SuperionJobMarketplaceV2.rerollNonRevealers(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#477-521) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp <= j.disputeDeadline (contracts/v2/SuperionJobMarketplaceV2.sol#483)
+SuperionJobMarketplaceV2.appeal(uint256,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#527-558) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp <= j.disputeDeadline (contracts/v2/SuperionJobMarketplaceV2.sol#535)
+	- block.timestamp > uint256(j.disputeDeadline) + sp.appealWindow (contracts/v2/SuperionJobMarketplaceV2.sol#536)
+SuperionJobMarketplaceV2._isFrozen(SuperionJobMarketplaceV2.DisputeExt) (contracts/v2/SuperionJobMarketplaceV2.sol#578-580) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp < x.frozenUntil (contracts/v2/SuperionJobMarketplaceV2.sol#579)
+SuperionJobMarketplaceV2.expireUnrevealedChallenge(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#583-604) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp <= d.seedRevealDeadline (contracts/v2/SuperionJobMarketplaceV2.sol#587)
+SuperionJobMarketplaceV2.commitVote(uint256,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#610-620) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp > d.voteCommitDeadline (contracts/v2/SuperionJobMarketplaceV2.sol#614)
+SuperionJobMarketplaceV2.revealVote(uint256,bool,bytes32) (contracts/v2/SuperionJobMarketplaceV2.sol#622-639) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp <= d.voteCommitDeadline (contracts/v2/SuperionJobMarketplaceV2.sol#626)
+	- block.timestamp > j.disputeDeadline (contracts/v2/SuperionJobMarketplaceV2.sol#627)
+SuperionJobMarketplaceV2.resolveDispute(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#651-676) uses timestamp for comparisons
+	Dangerous comparisons:
+	- ! allRevealed && block.timestamp <= j.disputeDeadline (contracts/v2/SuperionJobMarketplaceV2.sol#661)
+	- block.timestamp <= j.disputeDeadline (contracts/v2/SuperionJobMarketplaceV2.sol#663)
+	- block.timestamp <= uint256(j.disputeDeadline) + aw (contracts/v2/SuperionJobMarketplaceV2.sol#669)
+	- ! allRevealed && block.timestamp <= j.disputeDeadline (contracts/v2/SuperionJobMarketplaceV2.sol#670)
+SuperionJobMarketplaceV2.arbitrate(uint256,bool) (contracts/v2/SuperionJobMarketplaceV2.sol#678-701) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp <= d.seedRevealDeadline (contracts/v2/SuperionJobMarketplaceV2.sol#692)
+	- block.timestamp > uint256(d.seedRevealDeadline) + params.arbitrationWindow (contracts/v2/SuperionJobMarketplaceV2.sol#693)
+	- block.timestamp <= j.disputeDeadline (contracts/v2/SuperionJobMarketplaceV2.sol#695)
+	- block.timestamp > uint256(j.disputeDeadline) + params.arbitrationWindow (contracts/v2/SuperionJobMarketplaceV2.sol#696)
+SuperionJobMarketplaceV2.resolveStale(uint256) (contracts/v2/SuperionJobMarketplaceV2.sol#703-731) uses timestamp for comparisons
+	Dangerous comparisons:
+	- x.appellant != address(0) || _isFrozen(x) (contracts/v2/SuperionJobMarketplaceV2.sol#708)
+	- block.timestamp <= base + params.arbitrationWindow (contracts/v2/SuperionJobMarketplaceV2.sol#710)
+SuperionMerkleAirdrop.claim(address,uint256,bytes32[]) (contracts/v2/SuperionMerkleAirdrop.sol#39-48) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp > claimDeadline (contracts/v2/SuperionMerkleAirdrop.sol#40)
+SuperionMerkleAirdrop.sweep() (contracts/v2/SuperionMerkleAirdrop.sol#50-55) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp <= claimDeadline (contracts/v2/SuperionMerkleAirdrop.sol#51)
+SuperionStakingV2.completeUnstake() (contracts/v2/SuperionStakingV2.sol#111-120) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp < u.start + UNBONDING_PERIOD (contracts/v2/SuperionStakingV2.sol#115)
+SuperionStakingV2.earned(address) (contracts/v2/SuperionStakingV2.sol#122-130) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp < rewardEligibleAt[account] (contracts/v2/SuperionStakingV2.sol#125)
+SuperionStakingV2.claimRewards() (contracts/v2/SuperionStakingV2.sol#152-162) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp < rewardEligibleAt[msg.sender] (contracts/v2/SuperionStakingV2.sol#154)
+SuperionStakingV2._updateReward(address) (contracts/v2/SuperionStakingV2.sol#164-173) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp < rewardEligibleAt[account] (contracts/v2/SuperionStakingV2.sol#166)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#block-timestamp
+INFO:Detectors:
+Detector: constable-states
+JobMarketplace.challengePeriod (contracts/JobMarketplace.sol#37) should be constant 
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#state-variables-that-could-be-declared-constant
+INFO:Slither:. analyzed (107 contracts with 81 detectors), 61 result(s) found

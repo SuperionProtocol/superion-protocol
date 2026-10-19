@@ -28,6 +28,19 @@ async function fixture() {
   const superToken = await token.getAddress();
   const core = await deployCore(ethers, { superToken, deployer: admin, guardian: admin.address, marketParams: MP, gov: GOV });
   const { staking, timelock, governor, market } = core;
+  // V2-fixes : ces tests historiques valident la logique V2.1 de base ; on y désactive l'appel
+  // (appealWindow = 0) et le délai de sortie vérificateur. Les nouveaux mécanismes sont testés
+  // avec les valeurs par défaut dans test/v2-fixes.test.js.
+  {
+    const tlAddr = await timelock.getAddress();
+    await impersonateAccount(tlAddr);
+    await setBalance(tlAddr, ethers.parseEther("1"));
+    const sp = await market.securityParams();
+    await market.connect(await ethers.getSigner(tlAddr)).setSecurityParams({
+      stakeToValueBps: sp.stakeToValueBps, maxRerolls: sp.maxRerolls, verifierCooldown: 0,
+      appealWindow: 0, appealCommitteeSize: sp.appealCommitteeSize, appealBondBps: sp.appealBondBps,
+    });
+  }
   const stAddr = await staking.getAddress();
   const mAddr = await market.getAddress();
 

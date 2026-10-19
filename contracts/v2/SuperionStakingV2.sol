@@ -18,7 +18,7 @@ contract SuperionStakingV2 is ERC20, ERC20Votes, AccessControl, ReentrancyGuard 
     using SafeERC20 for ISuperToken;
 
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
-    uint256 public constant UNBONDING_PERIOD = 7 days;
+    uint256 public constant UNBONDING_PERIOD = 14 days; // FIX-3 : 7 j -> 14 j (fenêtre de surveillance plus longue)
     uint256 private constant PRECISION = 1e18;
 
     ISuperToken public immutable superToken;
