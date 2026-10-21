@@ -2,7 +2,7 @@
 
 **A verified-work marketplace on Base.** Clients post jobs and lock payment in escrow; providers stake to take work; and when a result is challenged, a committee of three randomly selected, staked verifiers votes on it through a commit–reveal scheme. Dishonest parties get slashed.
 
-> **Status: early stage.** Superion V2.1 is live on Base mainnet, but the protocol is young, usage is small, and **the contracts have not been audited yet**. Use at your own risk.
+> **Status: early stage.** An earlier version (V2.1) is live on Base mainnet. The new v2 contract (Chainlink VRF committee draw, full-bond loss for non-reveal, appeals) runs **only on Base Sepolia testnet** (branch [`v2-fixes`](https://github.com/SuperionProtocol/superion-protocol/tree/v2-fixes)). There are **0 users so far**, and **the contracts have not been externally audited yet** (an audit quote has been requested). The SUPER token exists, but there has been no sale and it has no market. Use at your own risk.
 
 ---
 
@@ -13,7 +13,7 @@ Most marketplaces trust whoever delivers the work. Superion makes delivery **ver
 - **Escrow**: the client's payment (in `SUPER`) sits in the marketplace contract until the job settles.
 - **Stake**: providers stake when they accept a job (`providerStakeBps`), and verifiers need a minimum stake to be eligible. Everyone involved has something to lose.
 - **Challenge & dispute**: after a result is submitted, a challenge window opens. Anyone who posts a challenge bond can dispute the result.
-- **Random verifier committee**: a disputed job goes to **3 verifiers** picked pseudo-randomly from the staked set, using a seed that is committed and then revealed.
+- **Random verifier committee**: a disputed job goes to **3 verifiers** picked from the staked set. In the new v2 contract (Base Sepolia testnet only) the draw uses **Chainlink VRF**; the earlier version live on Base mainnet uses a committed-then-revealed seed.
 - **Commit–reveal voting**: verifiers commit a hidden vote first and reveal it afterwards, so nobody can copy anyone else's vote.
 - **Slashing**: the losing side gets slashed (provider, challenger, or verifiers who were absent or in the minority), and part of each slash is burned.
 
@@ -63,6 +63,27 @@ Full deployment records (constructor arguments, parameters, and deployment tx ha
 
 ---
 
+## 🤝 We're looking for a technical co-founder (CTO)
+
+Superion is built by a solo, non-technical founder in the canton de Vaud, Switzerland, who works on it in the evenings and at weekends.
+
+**Honest status**
+- 0 users, no revenue, no funding.
+- Not externally audited yet (an audit quote has been requested).
+- The SUPER token exists, but there has been no sale and it has no market.
+- An earlier version is live on Base mainnet. The new v2 contract (Chainlink VRF draw, full-bond loss for non-reveal, bond scaling with dispute value, appeals, longer unbonding with auto-pause; 62 passing tests) runs only on Base Sepolia testnet, branch `v2-fixes`.
+- The live Chainlink VRF test on Sepolia is not confirmed yet (Chainlink's Sepolia service stopped answering on 21 Oct 2026).
+
+**Who we're looking for:** a Solidity/EVM developer with a security mindset who wants to own the protocol (the repo uses Hardhat; Foundry is welcome). Frontend (wagmi/viem) is a plus. Part-time is fine. Canton de Vaud, Switzerland, or remote; French is a plus, not required.
+
+**What we offer:** the CTO title, 30–50% equity, 4-year vesting with a 1-year cliff (the same rules apply to both founders), and a written co-founder agreement before any serious commitment. No salary for now.
+
+**How we'd start:** a video call, then a small, well-scoped task together. We will never ask you for money or private keys.
+
+Contact: **superion.protocol@proton.me**
+
+---
+
 ## Development
 
 Requirements: Node.js 18+ and npm.
@@ -104,5 +125,8 @@ This repository is open-source software provided "as is". Nothing here is an off
 ## Security
 
 - **Unaudited.** No independent security audit has been done yet.
-- Security fixes (seed reveal window cap, no same-block re-challenge) and extra tests (45 passing) are in the source, **pending redeploy**. The contracts are immutable, so the **deployed Base mainnet contracts still run the old version** until a redeploy.
+- **Base mainnet runs the earlier version.** The contracts are immutable, so the deployed mainnet contracts keep the old code (pseudo-random seed draw) until a redeploy.
+- **New v2 contract: Base Sepolia testnet only** (branch [`v2-fixes`](https://github.com/SuperionProtocol/superion-protocol/tree/v2-fixes)): Chainlink VRF committee draw, full-bond loss for verifiers who don't reveal, challenge bond that scales with the disputed value, appeals, longer unbonding with automatic pause. 62 tests passing.
+- **Live Chainlink VRF test on Sepolia not yet confirmed:** Chainlink's Sepolia VRF service stopped answering requests on 21 Oct 2026.
+- An external audit quote has been requested.
 - Please report vulnerabilities privately to **superion.protocol@proton.me**. Do not open public issues for them.
