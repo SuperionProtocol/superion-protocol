@@ -79,3 +79,15 @@ Aucun fonds n'est perdu par le rollback. La seule contrainte est le délai de d�
 - Le hasard du re-tirage est faible (blockhash). Un VRF est recommandé à terme.
 - Il faut assez de vérificateurs avec une grosse caution avant d'accepter de gros jobs.
 - **Audit recommandé avant le mainnet.**
+
+## 8. Chainlink VRF v2.5 (VRF-01) — à faire pour le mainnet
+
+Le marketplace V2-fixes+VRF tire les comités avec Chainlink VRF (voir `RESUME_VRF_FR.md`). Pour le mainnet Base :
+
+1. **Abonnement** sur le coordinateur Base `0xd5D517aBE5cF79B7e95eC98dB0f0277788aFF634` (`createSubscription`), idéalement **créé par le Safe** (propriétaire de l'abonnement = peut retirer/annuler les consommateurs ; ne doit pas rester une clé chaude). Paiement en **ETH natif** (`fundSubscriptionWithNative`) : pas besoin de LINK.
+2. **Constructeur** : `vrfCoordinator` + `VrfConfig{ keyHash 2 gwei 0x00b81b5a830cb0a4009fbd8904de511e28631e62ce5ad231373d3cdad373ccab, subId, callbackGasLimit 1 500 000, requestConfirmations 1–3, requestTimeout 3600 s, nativePayment true }`.
+3. Après déploiement : `addConsumer(subId, marketplace)` (Safe), puis `transferOwnership(Timelock)` et **`acceptOwnership()` exécuté par le Timelock** (proposition Governor, ou bootstrap avant renonciation de l'admin du Timelock comme sur Sepolia — `scripts/v2/deploy-vrf-sepolia.cjs`). Vérifier `owner() == Timelock` avant d'ouvrir les litiges.
+4. **Solde minimum (« Max Cost »)** exigé par Chainlink avant de servir une requête : `prix max de la voie × (200 000 + callbackGasLimit) × 1,6`. Voie 2 gwei + 1,5 M gaz → **≈ 0,0054 ETH** ; voie 30 gwei → ≈ 0,082 ETH. Recommandation : voie 2 gwei, abonnement alimenté à **0,02–0,05 ETH** et alerte si < 0,01 ETH.
+5. **Coût réel par tirage** (formule docs.chain.link/vrf/v2-5/billing : `prix du gaz × (vérification + callback) × (1 + prime 60 %)`) : callback mesuré ≈ 285 000 gaz (comité de 3), vérification ≈ 130 000 → ≈ 415 000 gaz × 0,01 gwei × 1,6 ≈ **0,0000066 ETH (≈ 2–3 centimes)** par tirage, + petite part de frais L1 de Base. Un litige complet = 1 tirage, + 1 par re-tirage, + 1 en cas d'appel (comité de 5, ~+100 000 gaz).
+6. Surveillance : requêtes en attente sur vrf.chain.link/base ; en cas de panne Chainlink, `retryDraw` (après `requestTimeout`) puis arbitre Timelock / `resolveStale`.
+7. Rappel taille : 24 483 / 24 576 octets — aucune marge pour de nouvelles fonctions sans scinder le contrat.

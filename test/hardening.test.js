@@ -2,7 +2,7 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { loadFixture, time, impersonateAccount, setBalance } = require("@nomicfoundation/hardhat-network-helpers");
 const { StandardMerkleTree } = require("@openzeppelin/merkle-tree");
-const { deployCore, deployDistribution, allocationAmounts } = require("../scripts/v2/lib.cjs");
+const { VRF_DEFAULTS, deployVrfMock, deployCore, deployDistribution, allocationAmounts } = require("../scripts/v2/lib.cjs");
 const { S, YEAR, DAY, MARKETPLACE_PARAMS_TESTNET: MP, GOV_TESTNET: GOV, TOTAL_SUPPLY } = require("../scripts/v2/config.cjs");
 
 const Status = { None: 0, Open: 1, Assigned: 2, Completed: 3, Disputed: 4, Finalized: 5, Refunded: 6, Cancelled: 7 };
@@ -52,7 +52,7 @@ async function fixture() {
   const stake = async (s, amt) => {
     await staking.connect(s).stake(S(amt));
   };
-  return { admin, creator, provider, v1, v2, v3, v4, challenger, alice, bob, team, outsider, token, staking, timelock, governor, market, stake, verifiers: [v1, v2, v3, v4] };
+  return { vrf: core.vrf.mock, admin, creator, provider, v1, v2, v3, v4, challenger, alice, bob, team, outsider, token, staking, timelock, governor, market, stake, verifiers: [v1, v2, v3, v4] };
 }
 
 async function withVerifiers() {
@@ -66,6 +66,11 @@ async function withVerifiers() {
   return f;
 }
 
+async function fulfillDraw(f, id) {
+  const r = (await f.market.pendingDraw(id)).requestId;
+  await f.vrf.fulfillRandomWords(r, await f.market.getAddress());
+}
+
 async function completedJob(f, budget = 1000) {
   const id = await f.market.nextJobId();
   await f.market.connect(f.creator).createJob(S(budget), 3600, "ipfs://job");
@@ -76,12 +81,10 @@ async function completedJob(f, budget = 1000) {
 
 /** Conteste + révèle le comité ; retourne { id, committee, seed } */
 async function challengeAndSelect(f, id, challenger = f.challenger) {
-  const seed = freshSeed("challenge-" + id.toString());
-  await f.market.connect(challenger).challengeJob(id, seedCommit(seed));
-  await time.increase(MP.seedRevealDelay + 1);
-  await f.market.connect(challenger).revealCommittee(id, seed);
+  await f.market.connect(challenger).challengeJob(id);
+  await fulfillDraw(f, id);
   const committee = await f.market.committeeOf(id);
-  return { committee, seed };
+  return { committee };
 }
 
 /** Commit + reveal des votes. votes[i] = bool providerValid pour committee[i] */
@@ -141,8 +144,10 @@ describe("Hardening — scénarios d'attaque", function () {
     const evil = await (await ethers.getContractFactory("ReentrantToken")).deploy();
     const eAddr = await evil.getAddress();
     const staking = await (await ethers.getContractFactory("SuperionStakingV2")).deploy(eAddr, admin.address, 60);
+    const vrf = await deployVrfMock(ethers, admin);
     const market = await (await ethers.getContractFactory("SuperionJobMarketplaceV2")).deploy(
-      eAddr, await staking.getAddress(), admin.address, admin.address, admin.address, { ...MP, providerStakeBps: 0 });
+      eAddr, await staking.getAddress(), admin.address, admin.address, admin.address, { ...MP, providerStakeBps: 0 },
+      vrf.coordinator, { ...VRF_DEFAULTS, keyHash: vrf.keyHash, subId: vrf.subId });
     await staking.grantRole(await staking.OPERATOR_ROLE(), await market.getAddress());
     const mAddr = await market.getAddress();
     await evil.mint(eAddr, S(1000));
@@ -181,7 +186,7 @@ describe("Hardening — scénarios d'attaque", function () {
     await time.increase(MP.challengePeriod + 1);
     await f.market.finalizeJob(id);
     await expect(f.market.finalizeJob(id)).to.be.revertedWithCustomError(f.market, "InvalidState");
-    await expect(f.market.connect(f.challenger).challengeJob(id, seedCommit(freshSeed()))).to.be.revertedWithCustomError(f.market, "InvalidState");
+    await expect(f.market.connect(f.challenger).challengeJob(id)).to.be.revertedWithCustomError(f.market, "InvalidState");
     const id2 = await completedJob(f);
     const { committee } = await challengeAndSelect(f, id2);
     await castCommitteeVotes(f, id2, committee, [false, false, false]);
@@ -247,29 +252,30 @@ describe("Hardening — scénarios d'attaque", function () {
     await expect(f.market.resolveDispute(id)).to.emit(f.market, "VerifierPenalized").withArgs(id, committee[2], S(100));
   });
 
-  it("HARDENING-01 : fenêtre de révélation > 8 min refusée ; révélation après 256 blocs refusée", async function () {
+  it("VRF-01 : seul le coordinateur peut livrer l'aléa ; une réponse inconnue est ignorée", async function () {
     const f = await withVerifiers();
-    const tl = await asTimelock(f);
-    const p = { ...MP, seedRevealWindow: 9 * 60 };
-    await expect(f.market.connect(tl).setParams(p)).to.be.revertedWithCustomError(f.market, "InvalidParams");
-    await f.market.connect(tl).setParams({ ...MP, seedRevealDelay: 30, seedRevealWindow: 480 });
     const id = await completedJob(f);
-    const seed = freshSeed();
-    await f.market.connect(f.challenger).challengeJob(id, seedCommit(seed));
-    await ethers.provider.send("hardhat_mine", ["0x104", "0x1"]); // 260 blocs, 1 s chacun
-    await expect(f.market.connect(f.challenger).revealCommittee(id, seed)).to.be.revertedWithCustomError(f.market, "TooLate");
+    await f.market.connect(f.challenger).challengeJob(id);
+    const req = (await f.market.pendingDraw(id)).requestId;
+    // le contestataire (ou n'importe qui) ne peut pas injecter son propre aléa
+    await expect(f.market.connect(f.challenger).rawFulfillRandomWords(req, [7n]))
+      .to.be.revertedWithCustomError(f.market, "OnlyCoordinatorCanFulfill");
+    expect((await f.market.disputes(id)).committeeSelected).to.equal(false);
+    await fulfillDraw(f, id);
+    expect((await f.market.committeeOf(id)).length).to.equal(3);
   });
 
-  it("HARDENING-02 : après expiration, la nouvelle échéance est déjà passée (pas de re-contestation même bloc)", async function () {
+  it("VRF-01 : le comité dépend uniquement du mot VRF (même mot -> même comité, plus de blockhash)", async function () {
     const f = await withVerifiers();
-    const id = await completedJob(f);
-    await f.market.connect(f.challenger).challengeJob(id, seedCommit(freshSeed()));
-    await time.increase(MP.seedRevealWindow + 1);
-    const tx = await f.market.expireUnrevealedChallenge(id);
-    const ts = (await ethers.provider.getBlock(tx.blockNumber)).timestamp;
-    expect((await f.market.jobs(id)).challengeDeadline).to.equal(BigInt(ts - 1));
-    await expect(f.market.connect(f.challenger).challengeJob(id, seedCommit(freshSeed()))).to.be.revertedWithCustomError(f.market, "TooLate");
-    await f.market.finalizeJob(id);
+    const id1 = await completedJob(f);
+    const id2 = await completedJob(f);
+    await f.market.connect(f.challenger).challengeJob(id1);
+    await ethers.provider.send("hardhat_mine", ["0x40", "0x1"]); // blocs différents
+    await f.market.connect(f.challenger).challengeJob(id2);
+    const m = await f.market.getAddress();
+    await f.vrf.fulfillRandomWordsWithOverride((await f.market.pendingDraw(id1)).requestId, m, [12345n]);
+    await f.vrf.fulfillRandomWordsWithOverride((await f.market.pendingDraw(id2)).requestId, m, [12345n]);
+    expect(await f.market.committeeOf(id1)).to.deep.equal(await f.market.committeeOf(id2));
   });
 });
 
@@ -312,7 +318,16 @@ describe("Hardening — fuzz / invariants (PRNG reproductible)", function () {
         else {
           await f.market.connect(f.provider).submitResult(id, "ipfs://r");
           if (path === 2) { await time.increase(MP.challengePeriod + 1); await f.market.finalizeJob(id); }
-          else if (path === 3) { await f.market.connect(f.challenger).challengeJob(id, seedCommit(freshSeed())); await time.increase(MP.seedRevealWindow + 1); await f.market.expireUnrevealedChallenge(id); await f.market.finalizeJob(id); }
+          else if (path === 3) {
+            // VRF non servi : relance après timeout puis comité unanime
+            await f.market.connect(f.challenger).challengeJob(id);
+            await time.increase(VRF_DEFAULTS.requestTimeout + 1);
+            await f.market.retryDraw(id);
+            const { committee } = { committee: (await fulfillDraw(f, id), await f.market.committeeOf(id)) };
+            await castCommitteeVotes(f, id, committee, committee.map(() => true));
+            if (committee.length > 0) await f.market.resolveDispute(id);
+            else { await time.increase(MP.voteRevealWindow + 1); await f.market.connect(await asTimelock(f)).arbitrate(id, true); }
+          }
           else {
             const { committee } = await challengeAndSelect(f, id);
             const votes = committee.map(() => pick(r, 2) === 0);
@@ -344,8 +359,6 @@ describe("Hardening — fuzz / invariants (PRNG reproductible)", function () {
       const q = await f.market.params();
       expect(q.feeBps).to.be.lte(1000n);
       expect(q.burnShareBps).to.be.lte(10000n);
-      expect(q.seedRevealWindow).to.be.lte(480n);
-      expect(q.seedRevealWindow).to.be.gte(q.seedRevealDelay);
       expect(q.committeeSize % 2n).to.equal(1n);
       expect(q.slashVerifierBps + q.slashChallengerBps).to.be.lte(10000n);
     }

@@ -31,7 +31,12 @@ async function fixture() {
   await impersonateAccount(tlAddr);
   await setBalance(tlAddr, ethers.parseEther("1"));
   const tl = await ethers.getSigner(tlAddr);
-  return { admin, creator, provider, challenger, outsider, vs, token, staking, market, tl };
+  return { vrf: core.vrf.mock, admin, creator, provider, challenger, outsider, vs, token, staking, market, tl };
+}
+
+async function fulfillDraw(f, id) {
+  const r = (await f.market.pendingDraw(id)).requestId;
+  await f.vrf.fulfillRandomWords(r, await f.market.getAddress());
 }
 
 async function completedJob(f, budget = 1000) {
@@ -42,11 +47,9 @@ async function completedJob(f, budget = 1000) {
   return id;
 }
 async function select(f, id, who, isAppeal = false) {
-  const seed = ethers.id("seed" + Math.random());
-  if (isAppeal) await f.market.connect(who).appeal(id, seedCommit(seed));
-  else await f.market.connect(who).challengeJob(id, seedCommit(seed));
-  await time.increase(MP.seedRevealDelay + 1);
-  await f.market.connect(who).revealCommittee(id, seed);
+  if (isAppeal) await f.market.connect(who).appeal(id);
+  else await f.market.connect(who).challengeJob(id);
+  await fulfillDraw(f, id);
   return f.market.committeeOf(id);
 }
 /** votes[i] : true/false = vote, null = commit sans reveal, undefined = absent */
@@ -76,9 +79,16 @@ describe("V2-fixes", function () {
       await expect(f.market.rerollNonRevealers(id)).to.be.revertedWithCustomError(f.market, "TooEarly");
       await time.increase(MP.voteRevealWindow + 1);
       await expect(f.market.rerollNonRevealers(id))
-        .to.emit(f.market, "VerifierPenalized").withArgs(id, c[2], S(100))
-        .and.to.emit(f.market, "CommitteeRerolled");
-      expect(await bond(f, c[2])).to.equal(S(900));
+        .to.emit(f.market, "VerifierPenalized").withArgs(id, c[2], S(1000)) // VRF-01 : caution ENTIÈRE
+        .and.to.emit(f.market, "CommitteeRerolled")
+        .and.to.emit(f.market, "DrawRequested");
+      expect(await bond(f, c[2])).to.equal(0);
+      expect((await f.market.verifiers(c[2])).indexPlus1).to.equal(0); // retiré de la liste
+      // tant que le VRF n'a pas répondu : pas de vote, pas de résolution, pas de 2e re-tirage
+      await expect(f.market.rerollNonRevealers(id)).to.be.revertedWithCustomError(f.market, "InvalidState");
+      await expect(f.market.resolveDispute(id)).to.be.revertedWithCustomError(f.market, "InvalidState");
+      expect((await f.market.committeeOf(id)).length).to.equal(2);
+      await fulfillDraw(f, id);
       expect(await f.market.memberVote(id, c[2])).to.equal(5);
       expect((await f.market.verifiers(c[2])).duties).to.equal(0);
       const c2 = await f.market.committeeOf(id);
@@ -109,6 +119,7 @@ describe("V2-fixes", function () {
       for (let r = 0; r < 2; r++) {
         await time.increase(VOTE_WINDOWS + 1);
         await f.market.rerollNonRevealers(id2);
+        await fulfillDraw(f, id2);
       }
       await time.increase(VOTE_WINDOWS + 1);
       await expect(f.market.rerollNonRevealers(id2)).to.be.revertedWithCustomError(f.market, "InvalidState");
@@ -139,7 +150,7 @@ describe("V2-fixes", function () {
       const c1 = await select(f, id, f.challenger);
       await vote(f, id, c1, [true, true, true]); // travail jugé valide
       await time.increase(MP.voteRevealWindow + 1);
-      await expect(f.market.connect(f.provider).appeal(id, seedCommit(ethers.id("x")))).to.be.revertedWithCustomError(f.market, "NotAllowed");
+      await expect(f.market.connect(f.provider).appeal(id)).to.be.revertedWithCustomError(f.market, "NotAllowed");
       expect(await f.market.appealBondFor(id)).to.equal(S(200)); // 20 % de 1000 > 2 x 25
       const ch0 = await f.token.balanceOf(f.challenger.address);
       const c2 = await select(f, id, f.challenger, true);
@@ -164,7 +175,7 @@ describe("V2-fixes", function () {
       const c1 = await select(f, id, f.challenger);
       await vote(f, id, c1, [false, false, true]); // travail invalide -> le fournisseur perd
       await time.increase(MP.voteRevealWindow + 1);
-      await expect(f.market.connect(f.challenger).appeal(id, seedCommit(ethers.id("x")))).to.be.revertedWithCustomError(f.market, "NotAllowed");
+      await expect(f.market.connect(f.challenger).appeal(id)).to.be.revertedWithCustomError(f.market, "NotAllowed");
       const c2 = await select(f, id, f.provider, true);
       await vote(f, id, c2, [false, false, false, false, true]);
       const before = await Promise.all([c1[0], c2[0]].map((a) => f.token.balanceOf(a)));
@@ -177,7 +188,7 @@ describe("V2-fixes", function () {
       expect(await bond(f, c2[4])).to.equal(S(900));
     });
 
-    it("appel sans majorité : verdict initial maintenu ; seed d'appel non révélé : appel perdu", async function () {
+    it("appel sans majorité : verdict initial maintenu ; VRF d'appel non servi : relance", async function () {
       const f = await loadFixture(fixture);
       const id = await completedJob(f, 1000);
       const c1 = await select(f, id, f.challenger);
@@ -190,14 +201,21 @@ describe("V2-fixes", function () {
       await expect(f.market.resolveDispute(id)).to.emit(f.market, "DisputeResolved").withArgs(id, true, false);
       expect((await f.market.jobs(id)).status).to.equal(Status.Finalized);
 
+      // appel dont la requête VRF n'est pas servie : relance après timeout, l'ancienne réponse est ignorée
       const id2 = await completedJob(f, 1000);
       const d1 = await select(f, id2, f.challenger);
       await vote(f, id2, d1, [true, true, true]);
       await time.increase(MP.voteRevealWindow + 1);
-      await f.market.connect(f.challenger).appeal(id2, seedCommit(ethers.id("never")));
-      await time.increase(MP.seedRevealWindow + 1);
-      await expect(f.market.expireUnrevealedChallenge(id2)).to.emit(f.market, "AppealSettled").withArgs(id2, false, S(200));
-      expect((await f.market.jobs(id2)).status).to.equal(Status.Finalized);
+      await f.market.connect(f.challenger).appeal(id2);
+      const old = (await f.market.pendingDraw(id2)).requestId;
+      await expect(f.market.retryDraw(id2)).to.be.revertedWithCustomError(f.market, "TooEarly");
+      await time.increase((await f.market.vrfConfig()).requestTimeout + 1n);
+      await expect(f.market.retryDraw(id2)).to.emit(f.market, "DrawRequested");
+      await f.vrf.fulfillRandomWords(old, await f.market.getAddress());
+      expect((await f.market.committeeOf(id2)).length).to.equal(0); // ancienne réponse ignorée
+      await fulfillDraw(f, id2);
+      expect((await f.market.committeeOf(id2)).length).to.be.greaterThan(0); // (5 éligibles max ; plusieurs exclus par le 1er litige)
+      expect((await f.market.disputes(id2)).committeeSelected).to.equal(true);
     });
 
     it("pas d'appel après la fenêtre ; résolution seulement après la fenêtre", async function () {
@@ -205,9 +223,9 @@ describe("V2-fixes", function () {
       const id = await completedJob(f, 1000);
       const c1 = await select(f, id, f.challenger);
       await vote(f, id, c1, [true, true, true]);
-      await expect(f.market.connect(f.challenger).appeal(id, seedCommit(ethers.id("x")))).to.be.revertedWithCustomError(f.market, "TooEarly");
+      await expect(f.market.connect(f.challenger).appeal(id)).to.be.revertedWithCustomError(f.market, "TooEarly");
       await time.increase(MP.voteRevealWindow + 3600 + 1);
-      await expect(f.market.connect(f.challenger).appeal(id, seedCommit(ethers.id("x")))).to.be.revertedWithCustomError(f.market, "TooLate");
+      await expect(f.market.connect(f.challenger).appeal(id)).to.be.revertedWithCustomError(f.market, "TooLate");
       await f.market.resolveDispute(id);
     });
   });
@@ -244,7 +262,7 @@ describe("V2-fixes", function () {
       await expect(f.market.connect(f.admin).freezeDispute(id)).to.emit(f.market, "DisputeFrozen");
       await time.increase(MP.voteRevealWindow + 3600 + 1);
       await expect(f.market.resolveDispute(id)).to.be.revertedWithCustomError(f.market, "Frozen");
-      await expect(f.market.connect(f.challenger).appeal(id, seedCommit(ethers.id("x")))).to.be.revertedWithCustomError(f.market, "Frozen");
+      await expect(f.market.connect(f.challenger).appeal(id)).to.be.revertedWithCustomError(f.market, "Frozen");
       // l'arbitre renverse le verdict suspect : les 2 votants "valide" sont pénalisés
       await expect(f.market.connect(f.tl).arbitrate(id, false)).to.emit(f.market, "DisputeResolved").withArgs(id, false, true);
       expect(await bond(f, c[0])).to.equal(S(900));

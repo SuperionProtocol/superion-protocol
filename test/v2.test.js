@@ -52,7 +52,7 @@ async function fixture() {
   const stake = async (s, amt) => {
     await staking.connect(s).stake(S(amt));
   };
-  return { admin, creator, provider, v1, v2, v3, v4, challenger, alice, bob, team, outsider, token, staking, timelock, governor, market, stake, verifiers: [v1, v2, v3, v4] };
+  return { vrf: core.vrf.mock, admin, creator, provider, v1, v2, v3, v4, challenger, alice, bob, team, outsider, token, staking, timelock, governor, market, stake, verifiers: [v1, v2, v3, v4] };
 }
 
 async function withVerifiers() {
@@ -66,6 +66,11 @@ async function withVerifiers() {
   return f;
 }
 
+async function fulfillDraw(f, id) {
+  const r = (await f.market.pendingDraw(id)).requestId;
+  await f.vrf.fulfillRandomWords(r, await f.market.getAddress());
+}
+
 async function completedJob(f, budget = 1000) {
   const id = await f.market.nextJobId();
   await f.market.connect(f.creator).createJob(S(budget), 3600, "ipfs://job");
@@ -76,12 +81,10 @@ async function completedJob(f, budget = 1000) {
 
 /** Conteste + révèle le comité ; retourne { id, committee, seed } */
 async function challengeAndSelect(f, id, challenger = f.challenger) {
-  const seed = freshSeed("challenge-" + id.toString());
-  await f.market.connect(challenger).challengeJob(id, seedCommit(seed));
-  await time.increase(MP.seedRevealDelay + 1);
-  await f.market.connect(challenger).revealCommittee(id, seed);
+  await f.market.connect(challenger).challengeJob(id);
+  await fulfillDraw(f, id);
   const committee = await f.market.committeeOf(id);
-  return { committee, seed };
+  return { committee };
 }
 
 /** Commit + reveal des votes. votes[i] = bool providerValid pour committee[i] */
@@ -303,7 +306,7 @@ describe("Superion V2.1", function () {
     it("comité tiré après reveal du seed ; exclus créateur/fournisseur/contestataire", async function () {
       const f = await withVerifiers();
       const id = await completedJob(f);
-      await expect(f.market.connect(f.provider).challengeJob(id, seedCommit(freshSeed()))).to.be.revertedWithCustomError(f.market, "NotAllowed");
+      await expect(f.market.connect(f.provider).challengeJob(id)).to.be.revertedWithCustomError(f.market, "NotAllowed");
       const { committee } = await challengeAndSelect(f, id, f.v1);
       expect(committee.length).to.equal(3);
       expect(committee).to.not.include(f.v1.address);
@@ -311,20 +314,19 @@ describe("Superion V2.1", function () {
       for (const m of committee) expect((await f.market.verifiers(m)).duties).to.equal(1);
     });
 
-    it("seed non révélé → expire, caution brûlée, job finalisable", async function () {
+    it("VRF non servi : votes bloqués, arbitre Timelock seulement après requestTimeout", async function () {
       const f = await withVerifiers();
       const id = await completedJob(f, 100);
-      const seed = freshSeed("expire");
-      await f.market.connect(f.challenger).challengeJob(id, seedCommit(seed));
-      await expect(f.market.connect(f.challenger).revealCommittee(id, seed)).to.be.revertedWithCustomError(f.market, "TooEarly");
-      await time.increase(MP.seedRevealWindow + 1);
-      const supply0 = await f.token.totalSupply();
-      await expect(f.market.expireUnrevealedChallenge(id))
-        .to.emit(f.market, "ChallengeExpired").withArgs(id, f.challenger.address, S(25));
-      expect(await f.token.totalSupply()).to.equal(supply0 - S(25));
-      expect((await f.market.jobs(id)).status).to.equal(Status.Completed);
-      await f.market.finalizeJob(id);
+      await expect(f.market.connect(f.challenger).challengeJob(id)).to.emit(f.market, "DrawRequested");
+      await expect(f.market.connect(f.v1).commitVote(id, ethers.id("x"))).to.be.revertedWithCustomError(f.market, "InvalidState");
+      const tl = await asTimelock(f);
+      await expect(f.market.connect(tl).arbitrate(id, true)).to.be.revertedWithCustomError(f.market, "TooEarly");
+      await time.increase((await f.market.vrfConfig()).requestTimeout + 1n);
+      await f.market.connect(tl).arbitrate(id, true);
       expect((await f.market.jobs(id)).status).to.equal(Status.Finalized);
+      // réponse tardive du coordinateur ignorée (litige clos) — le mock ne revert pas
+      await fulfillDraw(f, id);
+      expect((await f.market.committeeOf(id)).length).to.equal(0);
     });
 
     it("contestation rejetée 2 contre 1 : commit-reveal votes, caution aux majoritaires, minoritaire pénalisé", async function () {
@@ -396,7 +398,9 @@ describe("Superion V2.1", function () {
       await expect(f.market.resolveDispute(id)).to.be.revertedWithCustomError(f.market, "TooEarly");
       await time.increase(MP.voteRevealWindow + 1);
       await expect(f.market.connect(await ethers.getSigner(c)).revealVote(id, true, ethers.id("x"))).to.be.revertedWithCustomError(f.market, "TooLate");
-      await expect(f.market.resolveDispute(id)).to.emit(f.market, "VerifierPenalized").withArgs(id, c, S(100));
+      // VRF-01 : non-révélateur = caution ENTIÈRE saisie
+      await expect(f.market.resolveDispute(id)).to.emit(f.market, "VerifierPenalized").withArgs(id, c, S(1000));
+      expect((await f.market.verifiers(c)).bond).to.equal(0);
     });
 
     it("pas de majorité : arbitre Timelock après le vote ; sinon issue neutre", async function () {
@@ -418,8 +422,8 @@ describe("Superion V2.1", function () {
       await expect(f.market.connect(f.admin).arbitrate(id, false)).to.be.revertedWithCustomError(f.market, "AccessControlUnauthorizedAccount");
       await expect(f.market.resolveStale(id)).to.be.revertedWithCustomError(f.market, "TooEarly");
       await expect(f.market.connect(tl).arbitrate(id, false)).to.emit(f.market, "DisputeResolved").withArgs(id, false, true);
-      expect((await f.market.verifiers(a)).bond).to.equal(S(900));
-      expect((await f.market.verifiers(c)).bond).to.equal(S(900));
+      expect((await f.market.verifiers(a)).bond).to.equal(S(900)); // minoritaire : pénalité fixe
+      expect((await f.market.verifiers(c)).bond).to.equal(0);      // absent : caution entière
       expect((await f.market.verifiers(b)).bond).to.equal(S(1000));
 
       // second litige : personne ne tranche → issue neutre
@@ -459,10 +463,8 @@ describe("Superion V2.1", function () {
       await f.stake(f.provider, 5000);
       await time.increase(GOV.rewardEligibilityDelay + 1);
       const id = await completedJob(f, 100);
-      const seed = freshSeed("empty");
-      await f.market.connect(f.challenger).challengeJob(id, seedCommit(seed));
-      await time.increase(MP.seedRevealDelay + 1);
-      await f.market.connect(f.challenger).revealCommittee(id, seed);
+      await f.market.connect(f.challenger).challengeJob(id);
+      await fulfillDraw(f, id);
       expect((await f.market.committeeOf(id)).length).to.equal(0);
       await time.increase(VOTE_WINDOWS() + 1);
       await expect(f.market.resolveDispute(id)).to.be.revertedWithCustomError(f.market, "NoMajority");

@@ -20,7 +20,14 @@ module.exports = {
     compilers: [
       { version: "0.8.24", settings: { optimizer: { enabled: true, runs: 200 }, evmVersion: "cancun", viaIR: true } },
     ],
-    overrides: Object.fromEntries(V1_FILES.map((f) => [f, V1_SETTINGS])),
+    overrides: {
+      ...Object.fromEntries(V1_FILES.map((f) => [f, V1_SETTINGS])),
+      // VRF-01 : runs bas pour rester sous la limite EIP-170 (24 576 octets) avec VRFConsumerBaseV2Plus.
+      "contracts/v2/SuperionJobMarketplaceV2.sol": {
+        version: "0.8.24",
+        settings: { optimizer: { enabled: true, runs: 1 }, evmVersion: "cancun", viaIR: true },
+      },
+    },
   },
   networks: {
     hardhat: {

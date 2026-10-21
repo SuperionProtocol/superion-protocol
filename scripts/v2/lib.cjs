@@ -32,7 +32,24 @@ const ROLE = {
   PROPOSER: null, CANCELLER: null, OPERATOR: null,
 };
 
-async function deployCore(ethers, { superToken, deployer, guardian, marketParams, gov, log, existing = {} }) {
+/** VRF-01 : config VRF par défaut (testnet / tests). keyHash/subId/coordinateur fournis par l'appelant. */
+const VRF_DEFAULTS = { callbackGasLimit: 1_500_000, requestConfirmations: 1, requestTimeout: 600, nativePayment: true };
+
+/** Tests uniquement (chainId 31337) : déploie le mock officiel Chainlink VRFCoordinatorV2_5Mock + abonnement natif. */
+async function deployVrfMock(ethers, deployer) {
+  const { chainId } = await ethers.provider.getNetwork();
+  if (chainId !== 31337n) throw new Error("mock VRF réservé au réseau local");
+  const M = await ethers.getContractFactory("VRFCoordinatorV2_5Mock", deployer);
+  const mock = await M.deploy(ethers.parseEther("0.0001"), 1_000_000_000n, 4_000_000_000_000_000n);
+  await mock.waitForDeployment();
+  const rc = await (await mock.createSubscription()).wait();
+  const subId = rc.logs.map((l) => { try { return mock.interface.parseLog(l); } catch { return null; } })
+    .find((e) => e && e.name === "SubscriptionCreated").args.subId;
+  await (await mock.fundSubscriptionWithNative(subId, { value: ethers.parseEther("100") })).wait();
+  return { mock, coordinator: await mock.getAddress(), subId, keyHash: ethers.id("superion-test-keyhash") };
+}
+
+async function deployCore(ethers, { superToken, deployer, guardian, marketParams, gov, log, existing = {}, vrf }) {
   ROLE.PROPOSER = ethers.id("PROPOSER_ROLE");
   ROLE.CANCELLER = ethers.id("CANCELLER_ROLE");
   ROLE.OPERATOR = ethers.id("OPERATOR_ROLE");
@@ -59,7 +76,10 @@ async function deployCore(ethers, { superToken, deployer, guardian, marketParams
   const governor = await d("SuperionGovernor", [
     stAddr, tl, gov.votingDelay, gov.votingPeriod, gov.proposalThreshold, gov.quorumPercent, gov.quorumAbsoluteMin,
   ]);
-  const market = await d("SuperionJobMarketplaceV2", [superToken, stAddr, tl, guardian, tl, marketParams]);
+  let vrfMock;
+  if (!vrf) { vrfMock = await deployVrfMock(ethers, deployer); vrf = vrfMock; }
+  const vrfConfig = { ...VRF_DEFAULTS, ...(vrf.config || {}), keyHash: vrf.keyHash, subId: vrf.subId };
+  const market = await d("SuperionJobMarketplaceV2", [superToken, stAddr, tl, guardian, tl, marketParams, vrf.coordinator, vrfConfig]);
   const gAddr = await governor.getAddress();
   const mAddr = await market.getAddress();
 
@@ -84,9 +104,15 @@ async function deployCore(ethers, { superToken, deployer, guardian, marketParams
   await renounce("st_renounce_admin_deployer", staking, ROLE.DEFAULT_ADMIN);
   // Marketplace : admin = Timelock dès le constructeur (ARBITER_ROLE aussi)
   // Timelock : le déployeur renonce à son rôle admin (le timelock s'administre lui-même)
-  await renounce("tl_renounce_admin_deployer", timelock, ROLE.DEFAULT_ADMIN);
+  if (vrfMock) await (await vrfMock.mock.addConsumer(vrfMock.subId, mAddr)).wait();
+  // VRF-01 : la propriété VRF (setCoordinator) part au Timelock ; il doit appeler acceptOwnership()
+  // (en test : signer imposteur ; sur testnet : bootstrap timelock avant renonciation, cf. deploy-vrf-sepolia.cjs).
+  if ((await market.owner()) === dep && !existing.SuperionJobMarketplaceV2) {
+    txs.mk_transfer_vrf_owner_timelock = (await waitTx(() => market.transferOwnership(tl), log, "mk_transfer_vrf_owner_timelock")).hash;
+  }
+  if (!vrf.keepTimelockAdmin) await renounce("tl_renounce_admin_deployer", timelock, ROLE.DEFAULT_ADMIN);
 
-  return { staking, timelock, governor, market, txs };
+  return { staking, timelock, governor, market, txs, vrf: vrfMock, vrfConfig };
 }
 
 /** Calcule les montants de la répartition (somme exacte = offre totale). */
@@ -148,4 +174,4 @@ async function deployDistribution(ethers, { superToken, funder, timelock, team, 
   return out;
 }
 
-module.exports = { ROLE, deployCore, deployDistribution, allocationAmounts, waitTx, withRetry, sleep };
+module.exports = { ROLE, VRF_DEFAULTS, deployVrfMock, deployCore, deployDistribution, allocationAmounts, waitTx, withRetry, sleep };

@@ -1,0 +1,116 @@
+{
+  "txs": {
+    "vrf_createSubscription": "0x1ecb07854e08665c1458243662f816c49f10efee2a7e3689a1b8fea44526ceeb",
+    "vrf_fundNative": "0x6813287c7bf53fdb0f0278cb565a713d2ff965ecb7f0f7dd02c37c62f8def9f5",
+    "deploy_SuperionStakingV2": "0x4faa7acc769b784b49b6f3b3b2e7a71403a28d656d5969031ff7e22dd769f3a4",
+    "deploy_SuperionTimelock": "0xfcdd5cabad192219916375e7f6bc32f602d63a210e2e4f27fef454ef9f84034c",
+    "deploy_SuperionGovernor": "0xe8df2cf1720ce441a5f92519e4b449eae95315cee219c9410758f12e357aabae",
+    "deploy_SuperionJobMarketplaceV2": "0x33c55bf161f2c0873918c82e65007d453bcc02889c0a5677629662b3805ff1c1",
+    "tl_grant_proposer_governor": "0x5f02c8c768b6281bf1d0df1e1f6ab9ea84c2dff4b6e9d6dddb5ed6c379dc83df",
+    "tl_grant_canceller_governor": "0xef547f3393f619d1386992be136e2edaa237b736995056aa2be867456905ce24",
+    "tl_grant_canceller_guardian": "0x307a009ed05eb1efee623e48f37fa090041ea8ca373ef52ba4d891c3035c803c",
+    "st_grant_operator_market": "0xfa00f135dfbb588702ae74150a10584ec0183e1361fadce2bf1bfb86f5157a1e",
+    "st_grant_admin_timelock": "0x3928d74f6b338a6e54b90e72bd8463bf9ef8785aa28e34f15b2ff6c9ccae7dbe",
+    "st_renounce_admin_deployer": "0xfecb9ee9e61c22285da5ea9156625a4faf19b56a6130a8d5eb4c15e353cf8350",
+    "mk_transfer_vrf_owner_timelock": "0xdd14c9d7a8da721d405252e1d327038a18d04ec25482bbe7d2883f4602076558",
+    "vrf_addConsumer": "0x15ff8b48dc778b8e5688b7cbf3941a6ea3126054d38f318ae4013e8dd73d539c",
+    "tl_grant_proposer_deployer_tmp": "0xa1e7ad8f2e0a1e70256f3a97260740378659d351356d303c57ac683e8ef13cfb",
+    "tl_schedule_accept": "0x5b3faf717a06cf4311ad37c59fdacc55298020b9a5c5e5b61dbd03a583b8db96",
+    "tl_execute_accept": "0x3a98774f4b18d5330ea48a5284bb49e0062b8299d38f7b28c93fcc2791c0e769",
+    "tl_revoke_proposer_deployer": "0x885214f00b715e727e7f2a80b1be95e3504a4e9cc7428f0c43d32ce337dec755",
+    "tl_renounce_admin_deployer": "0x26ca997cd25cd2d9c6c0e17e126fb2a149d3788cb749b7aeec05fb4846b0e039",
+    "vrf_topup_1792607786226": "0x8c662afd49cc7621451a7da751bee9b79b3a1a0b5a2397edbea5eb37c8cee9b0"
+  },
+  "version": "2.1-fixes-vrf",
+  "network": "baseSepolia",
+  "chainId": 84532,
+  "deployer": "0xE60322A5543C2bAD26115053B586d9679F4A939f",
+  "superToken": "0xf5a6F83CE27692A247C3B2d1b7e0a3C3234300b4",
+  "vrf": {
+    "coordinator": "0x5C210eF41CD1a72de73bF76eC39637bB0d3d7BEE",
+    "keyHash": "0x9e1344a1247c8a1785d0a4681a27152bffdb43666ae5bf7d14d24a5efd44bf71",
+    "linkToken": "0xE4aB69C077896252FAFBD49EFD26B5D171A32410",
+    "config": {
+      "callbackGasLimit": 500000,
+      "requestConfirmations": 1,
+      "requestTimeout": 600,
+      "nativePayment": true
+    },
+    "docs": "https://docs.chain.link/vrf/v2-5/supported-networks",
+    "subId": "85006504239726103241460650811532519310592202823175411004880197489781121368894",
+    "fundedNative": "0.02",
+    "subscription": {
+      "nativeBalance": "0.06",
+      "owner": "0xE60322A5543C2bAD26115053B586d9679F4A939f",
+      "consumers": [
+        "0xa4E1290Bb984BFd4ba037a1ED11cE5584BbDe342"
+      ]
+    }
+  },
+  "contracts": {
+    "stakingV2": "0xAc9C43F76304376EB2Eff00bE20eBE6cf69f5612",
+    "timelock": "0xA76CA7Fb14ACcC61A5c72c02FFfF007d27ee87D2",
+    "governor": "0xA3bAe9724D2252e2a2bbC2642aEae215946A576E",
+    "marketplaceV2": "0xa4E1290Bb984BFd4ba037a1ED11cE5584BbDe342"
+  },
+  "deployedAt": "2026-10-21T18:19:23.039Z",
+  "checks": {
+    "marketOwner": "0xA76CA7Fb14ACcC61A5c72c02FFfF007d27ee87D2",
+    "marketAdminIsTimelock": true,
+    "deployerTimelockAdmin": false,
+    "coordinator": "0x5C210eF41CD1a72de73bF76eC39637bB0d3d7BEE",
+    "codeSizeMarket": 24483
+  },
+  "e2e": {
+    "txs": {
+      "fund_eth_provider": "0x047094b09b142a780af0d4b311b1846f11cf084acb2766a9a6ceebc4b2d618bd",
+      "fund_super_provider": "0xae8bdb208ac88ce9edf9c584f944b9010e1621b70419c20c132d14a54632aa6e",
+      "fund_eth_challenger": "0x41bb6aa47ecf48063335b0307f90cb737ae176e350c29e71a2b9f23ccd850c1e",
+      "fund_super_challenger": "0xbba457e4a73560169f91f272aea653e9829b0a7e13294a21723744a9e0ebbcfb",
+      "fund_eth_v1": "0xf9a4707405c52ab02296c23849c952f5b03db22662d8ce9f99093cf747da49fe",
+      "fund_super_v1": "0xd403dc2f1503072b27659adf209a72b45f94fdf3520309d2997d3df281a05809",
+      "fund_eth_v2": "0xd2e0ebe776ed2da1b6542a7b8e73f60233c7404f0a9fdba0e1c96b078f66487d",
+      "fund_super_v2": "0x8bec050787eabd08c2b87b8553d822759ece6cfaab5109e75d0678259f7b5ef2",
+      "fund_eth_v3": "0x7b2d112faedbda907aa4b4c636f24b4033060afcdcd2b8e667928c7109271f71",
+      "fund_super_v3": "0x90b3ebd4c1fa962d1f6ca01ab528b4239f9d944d3ed8840972a2a9afb0b27e44",
+      "fund_eth_v4": "0x9d9c624540c49fac9d26fd2444b8a33e574bc53da1d20bc395b10850240694b6",
+      "fund_super_v4": "0x2b9ecf7a2107d55086d664efbb1074139a1bf497607ba60abd0b718365a0b426",
+      "fund_eth_v5": "0x202af5ce11c3cc07cf2a19aedaae97ce33bd84b5921375062ee65109ca829548",
+      "fund_super_v5": "0x047da70cafb39efaafac17201f8e5ee0ed1e818467afd37f5f89c22fdef8e206",
+      "approve_st_v1": "0xe047dbad2ec5efe7f5e1b15b37fa99bb05518e13325525722490f23587cbeb95",
+      "stake_v1": "0x3aba7159db8c492900844923e05ba53f62d8582b806de94f1c371216e98d77c3",
+      "register_v1": "0xfdd8c03837a1cd7c09635ff71f231494a266c1a9332fc58a6746d9373346c23a",
+      "approve_st_v2": "0x68e2daeb5ef80c75a6b365e20800e423939674b5dfa3887b73da48eb813e7a4b",
+      "stake_v2": "0x6600350ce18dcde269b199d412f6ea84ff4f4d54c68c6ed7234e3f099e275db5",
+      "register_v2": "0x5a41c5cde14d2008469716684ef691412a121a22f19cc25181ec35391559844c",
+      "approve_st_v3": "0xe9a97bd428be1b2f5d54911eb863e559ea8839ce09675e26f976d7510faa9517",
+      "stake_v3": "0x19ea644cbfdceb54a83feddbeb17541dbf7e913a8cab941f4806e38e404eb32b",
+      "register_v3": "0xd981e2c5972de08733168f76464493456442f0af3c369fef70445e8f68c90511",
+      "approve_st_v4": "0x2fda6bcb820bb03a68185cd8dfcb2f2a4b58c895c3e19585f5f5ef8f5516afaa",
+      "stake_v4": "0x29dbee6cb17ee798bf56c664f00429d6bd576d7afbf448089f618126429c5b8c",
+      "register_v4": "0x0492de52b8700adff8cec8541c11baccf40a88a8839ef6f924544379073b2e72",
+      "approve_st_v5": "0x3ebe210b62f9b1ff00595d843c7e78593a311e82d459c7140cae2a720a3b8502",
+      "stake_v5": "0x7e0bc2dba74d862050ff3af18f3da5eb24148a682c7070fa76617e87f5b54af1",
+      "register_v5": "0xe039eb2ad3aa4cdd8a98b4d07a131a4de8c3a0d93c96fa14ab162572ded18e58",
+      "approve_st_provider": "0x045e7e59bfa76136e6324a1a9019cbc2d9babb21abeb21568c77b4865854882f",
+      "stake_provider": "0xea28a79f42d54ba001e83a8696558a7a1e44117885f37459f447c517e1a06920",
+      "approve_mk_challenger": "0x8157dda7bb43ca0221a6bcdf96c842a59d451baab4eb72b8b61c19d6a40d49b6",
+      "approve_mk_creator": "0xda68d96215529a24e6915829b28c49275d5fc448a304f0f0490b48050015d789",
+      "createJob": "0x12199906aaa382bd1d0059b5e6863193db7daf0947279561ad69b995a9d9bf0f",
+      "assignJob": "0x80a88fa54f616b9664d327081f74e9726689deb0c17966cdd0ff36c9b950a306",
+      "submitResult": "0x133e971aca63bc40734c07ca88bb73d0386374d32c49d54d6950cfec192c888f",
+      "challengeJob": "0xd854a2fd11a84b07b095a50f77d36af90ea748f57613fb4cda985464a5e9a966"
+    },
+    "wallets": {
+      "provider": "0x894DdB5BDC498C7f57b9dfdf3Ed0867c638f0f08",
+      "challenger": "0xF6E4703Be83d3F7886845a9Ea53e9da3Fb37Dc86",
+      "v1": "0x4363739Fd7bf9bEf0DcD7f772c0B77bEea63031B",
+      "v2": "0x424bb57C9B4Ac1DA7907531068E4Ebd615a75086",
+      "v3": "0xc23E856BcbBF9083b4BdbfE9350699293621Ba64",
+      "v4": "0xC8f1f83cDCEC74FD4963126B57BE472F9A1e71Ab",
+      "v5": "0x0FA6A24Bd16f636B70891A78d8cd021D9fcfA20a"
+    },
+    "jobId": "1",
+    "draw1_requestId": "58841028226624754670561009123461556808328051983970045732244288281341623297876"
+  }
+}

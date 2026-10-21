@@ -18,3 +18,4 @@ typechain-types/
 .ui-wallet.json
 *.bak*
 .DS_Store
+.vrf-e2e-wallets.json

@@ -6,6 +6,8 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "./ISuperToken.sol";
+import {VRFConsumerBaseV2Plus} from "@chainlink/contracts/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol";
+import {VRFV2PlusClient} from "@chainlink/contracts/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
 
 interface IStakingV2 {
     function availableStake(address user) external view returns (uint256);
@@ -19,14 +21,16 @@ interface IStakingV2 {
  * @title SuperionJobMarketplaceV2
  * @notice Marketplace de jobs payés en SUPER (V2.1) avec :
  *   - finalisation optimiste ;
- *   - contestation en commit-reveal (seed) puis tirage de comité (H-01) ;
+ *   - contestation puis tirage de comité par Chainlink VRF v2.5 (VRF-01 : asynchrone,
+ *     personne ne peut influencer l'aléa ; re-tirage des non-révélateurs aussi par VRF) ;
  *   - votes de vérificateurs en commit-reveal (M-01) ;
  *   - feeBps / burnShareBps figés à la création du job ; pénalité et slash bps
  *     figés à la contestation (M-03) ;
  *   - arbitre Timelock de secours / issue neutre.
  *   Paramètres modifiables uniquement par DEFAULT_ADMIN_ROLE (= Timelock).
+ *   Coordinateur VRF : setCoordinator réservé à owner() (ConfirmedOwner) = Timelock après acceptOwnership.
  */
-contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable {
+contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable, VRFConsumerBaseV2Plus {
     using SafeERC20 for ISuperToken;
 
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
@@ -39,10 +43,8 @@ contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable {
     uint256 public constant MAX_JOB_DURATION = 365 days;
     uint256 public constant MIN_CHALLENGE_BOND = 1 ether / 1000; // 0.001 SUPER (anti-spam)
     uint256 public constant MAX_CHALLENGE_BOND = 1_000_000 ether;
-    /// @dev HARDENING-01 : blockhash() n'est disponible que pour les 256 derniers blocs (~512 s sur Base).
-    ///      Au-delà, l'ancien code retombait sur blockhash(block.number - 1), que le contestataire
-    ///      peut choisir en retardant sa révélation (manipulation du comité). On plafonne la fenêtre.
-    uint256 public constant MAX_SEED_REVEAL_WINDOW = 8 minutes;
+    // VRF-01 : seedRevealDelay/seedRevealWindow restent dans Params (ABI/constructeur inchangés)
+    // mais ne servent plus (plus de seed ni de blockhash) ; ils ne sont donc plus validés.
     /// @dev FIX-3 : durée max d'un gel de litige par le gardien (borne le pouvoir du gardien).
     uint256 public constant MAX_DISPUTE_FREEZE = 7 days;
     uint256 public constant MAX_REROLLS = 3;
@@ -54,8 +56,8 @@ contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable {
         uint16 feeBps;
         uint16 burnShareBps;
         uint32 challengePeriod;
-        uint32 seedRevealDelay;    // attente min avant révélation du seed (commit-reveal comité)
-        uint32 seedRevealWindow;   // fenêtre max pour révéler le seed
+        uint32 seedRevealDelay;    // (inutilisé depuis VRF-01, conservé pour l'ABI)
+        uint32 seedRevealWindow;   // (inutilisé depuis VRF-01, conservé pour l'ABI)
         uint32 voteCommitWindow;   // phase commit des votes
         uint32 voteRevealWindow;   // phase reveal des votes
         uint32 arbitrationWindow;
@@ -94,6 +96,24 @@ contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable {
     mapping(uint256 => address[]) internal _firstCommittees;
     mapping(address => uint64) public lastDutyEnd;
 
+    /// @notice VRF-01 : configuration Chainlink VRF v2.5 (modifiable par le Timelock uniquement).
+    struct VrfConfig {
+        bytes32 keyHash;
+        uint256 subId;
+        uint32 callbackGasLimit;
+        uint16 requestConfirmations;
+        uint32 requestTimeout;       // délai après lequel une requête non servie peut être relancée
+        bool nativePayment;          // true = abonnement payé en ETH (pas de LINK)
+    }
+    VrfConfig public vrfConfig;
+    struct DrawRequest {
+        uint256 requestId;           // != 0 : tirage en attente
+        uint64 requestedAt;
+        uint8 k;                     // nb de membres à tirer
+    }
+    mapping(uint256 => DrawRequest) public pendingDraw;   // jobId => requête en cours
+    mapping(uint256 => uint256) public vrfRequestJob;     // requestId => jobId
+
     enum Status { None, Open, Assigned, Completed, Disputed, Finalized, Refunded, Cancelled }
 
     struct Job {
@@ -116,10 +136,6 @@ contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable {
         uint8 votesValid;
         uint8 votesInvalid;
         uint256 bond;
-        bytes32 seedCommit;
-        uint64 commitBlock;
-        uint64 seedRevealEarliest;
-        uint64 seedRevealDeadline;
         uint64 voteCommitDeadline;
         uint256 verifierPenalty;    // figé à la contestation
         uint16 slashVerifierBps;
@@ -148,9 +164,8 @@ contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable {
     event JobCreated(uint256 indexed jobId, address indexed creator, uint256 budget, uint16 feeBps, string jobURI);
     event JobAssigned(uint256 indexed jobId, address indexed provider, uint256 lockedStake);
     event JobCompleted(uint256 indexed jobId, string resultURI, uint256 challengeDeadline);
-    event JobChallenged(uint256 indexed jobId, address indexed challenger, uint256 bond, bytes32 seedCommit, uint256 seedRevealDeadline);
+    event JobChallenged(uint256 indexed jobId, address indexed challenger, uint256 bond, uint256 requestId);
     event CommitteeSelected(uint256 indexed jobId, address[] committee, uint256 voteCommitDeadline, uint256 voteRevealDeadline);
-    event ChallengeExpired(uint256 indexed jobId, address indexed challenger, uint256 bondBurned);
     event VoteCommitted(uint256 indexed jobId, address indexed verifier, bytes32 commitHash);
     event VoteCast(uint256 indexed jobId, address indexed verifier, bool providerValid);
     event DisputeResolved(uint256 indexed jobId, bool providerValid, bool byArbiter);
@@ -163,13 +178,16 @@ contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable {
     event VerifierExited(address indexed verifier, uint256 bondReleased);
     event Burned(uint256 amount);
     event SecurityParamsUpdated(SecurityParams p);
-    event CommitteeRerolled(uint256 indexed jobId, address[] removed, address[] committee, uint256 voteCommitDeadline, uint256 voteRevealDeadline);
-    event AppealFiled(uint256 indexed jobId, address indexed appellant, uint256 bond, bytes32 seedCommit, uint256 seedRevealDeadline);
+    event CommitteeRerolled(uint256 indexed jobId, address[] removed, uint256 requestId);
+    event AppealFiled(uint256 indexed jobId, address indexed appellant, uint256 bond, uint256 requestId);
     event AppealCommitteeSelected(uint256 indexed jobId, address[] committee);
     event AppealSettled(uint256 indexed jobId, bool overturned, uint256 appealBond);
     event DisputeFrozen(uint256 indexed jobId, uint256 until);
     event DisputeUnfrozen(uint256 indexed jobId);
     event VerifierBondIncreased(address indexed verifier, uint256 amount, uint256 newBond);
+    event VrfConfigUpdated(VrfConfig c);
+    event DrawRequested(uint256 indexed jobId, uint256 indexed requestId, uint256 k);
+    event DrawFulfilled(uint256 indexed jobId, uint256 indexed requestId, uint256 randomWord);
 
     error InvalidParams();
     error InvalidState();
@@ -183,7 +201,10 @@ contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable {
     error Frozen();
     error Cooldown();
 
-    constructor(address _superToken, address _staking, address admin, address pauser, address arbiter, Params memory p) {
+    constructor(
+        address _superToken, address _staking, address admin, address pauser, address arbiter, Params memory p,
+        address vrfCoordinator, VrfConfig memory vc
+    ) VRFConsumerBaseV2Plus(vrfCoordinator) {
         superToken = ISuperToken(_superToken);
         staking = IStakingV2(_staking);
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
@@ -198,6 +219,23 @@ contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable {
             appealCommitteeSize: 5,
             appealBondBps: 2_000         // 20 % du budget (min 2 x caution de contestation)
         }));
+        _setVrfConfig(vc);
+    }
+
+    /// @notice VRF-01 : Timelock uniquement. (Le coordinateur se change via setCoordinator, owner = Timelock.)
+    function setVrfConfig(VrfConfig calldata c) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _setVrfConfig(c);
+    }
+
+    function _setVrfConfig(VrfConfig memory c) internal {
+        if (
+            c.keyHash == bytes32(0) || c.subId == 0
+                || c.callbackGasLimit < 100_000 || c.callbackGasLimit > 2_500_000
+                || c.requestConfirmations > 200
+                || c.requestTimeout < 1 minutes || c.requestTimeout > 1 days
+        ) revert InvalidParams();
+        vrfConfig = c;
+        emit VrfConfigUpdated(c);
     }
 
     function setSecurityParams(SecurityParams calldata s) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -230,8 +268,6 @@ contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable {
         if (
             p.feeBps > MAX_FEE_BPS || p.burnShareBps > BPS
                 || p.challengePeriod < 1 minutes || p.challengePeriod > 7 days
-                || p.seedRevealDelay < 30 seconds
-                || p.seedRevealWindow < p.seedRevealDelay || p.seedRevealWindow > MAX_SEED_REVEAL_WINDOW
                 || p.voteCommitWindow < 1 minutes || p.voteCommitWindow > 7 days
                 || p.voteRevealWindow < 1 minutes || p.voteRevealWindow > 7 days
                 || p.arbitrationWindow < 1 hours || p.arbitrationWindow > 30 days
@@ -380,15 +416,13 @@ contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable {
     }
 
     // ------------------------------------------------------------------
-    // Contestation : commit-reveal du seed puis tirage du comité (H-01)
+    // Contestation puis tirage du comité par Chainlink VRF (VRF-01)
     // ------------------------------------------------------------------
-    /// @param seedCommit keccak256(abi.encode(seed)) — le seed sera révélé après seedRevealDelay
-    function challengeJob(uint256 jobId, bytes32 seedCommit) external nonReentrant {
+    function challengeJob(uint256 jobId) external nonReentrant {
         Job storage j = jobs[jobId];
         if (j.status != Status.Completed) revert InvalidState();
         if (block.timestamp > j.challengeDeadline) revert TooLate();
         if (msg.sender == j.provider) revert NotAllowed();
-        if (seedCommit == bytes32(0)) revert BadCommit();
 
         Params memory p = params;
         uint256 bond = p.challengeBond;
@@ -397,57 +431,64 @@ contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable {
         Dispute storage d = disputes[jobId];
         d.challenger = msg.sender;
         d.bond = bond;
-        d.seedCommit = seedCommit;
-        d.commitBlock = uint64(block.number);
-        d.seedRevealEarliest = uint64(block.timestamp + p.seedRevealDelay);
-        d.seedRevealDeadline = uint64(block.timestamp + p.seedRevealWindow);
         d.verifierPenalty = p.verifierPenalty;
         d.slashVerifierBps = p.slashVerifierBps;
         d.slashChallengerBps = p.slashChallengerBps;
         d.committeeSelected = false;
 
         j.status = Status.Disputed;
-        emit JobChallenged(jobId, msg.sender, bond, seedCommit, d.seedRevealDeadline);
+        emit JobChallenged(jobId, msg.sender, bond, _requestDraw(jobId, p.committeeSize));
     }
 
-    /// @notice Révèle le seed et tire le comité. Aléa = keccak(seed, blockhash(commitBlock+1), jobId).
-    ///         Sert aussi au tirage du comité d'appel (FIX-2b) : c'est alors l'appelant qui révèle.
-    function revealCommittee(uint256 jobId, bytes32 seed) external nonReentrant {
+    /// @dev VRF-01 : demande un mot aléatoire à Chainlink ; le comité est tiré dans fulfillRandomWords.
+    ///      Toute requête précédente du job est invalidée (sa réponse sera ignorée).
+    function _requestDraw(uint256 jobId, uint256 k) internal returns (uint256 requestId) {
+        VrfConfig memory c = vrfConfig;
+        requestId = s_vrfCoordinator.requestRandomWords(VRFV2PlusClient.RandomWordsRequest({
+            keyHash: c.keyHash,
+            subId: c.subId,
+            requestConfirmations: c.requestConfirmations,
+            callbackGasLimit: c.callbackGasLimit,
+            numWords: 1,
+            extraArgs: VRFV2PlusClient._argsToBytes(VRFV2PlusClient.ExtraArgsV1({nativePayment: c.nativePayment}))
+        }));
+        DrawRequest storage r = pendingDraw[jobId];
+        r.requestId = requestId;
+        r.requestedAt = uint64(block.timestamp);
+        r.k = uint8(k);
+        vrfRequestJob[requestId] = jobId;
+        emit DrawRequested(jobId, requestId, k);
+    }
+
+    /// @notice VRF-01 : requête non servie après requestTimeout -> n'importe qui la relance (nouvelle requête,
+    ///         l'ancienne est ignorée si elle arrive plus tard). Ne permet jamais de choisir entre deux aléas.
+    function retryDraw(uint256 jobId) external nonReentrant {
+        DrawRequest storage r = pendingDraw[jobId];
+        if (jobs[jobId].status != Status.Disputed || r.requestId == 0) revert InvalidState();
+        if (block.timestamp <= uint256(r.requestedAt) + vrfConfig.requestTimeout) revert TooEarly();
+        _requestDraw(jobId, r.k);
+    }
+
+    /// @dev Callback Chainlink (via rawFulfillRandomWords, qui vérifie msg.sender == coordinateur).
+    ///      Ne revert jamais : une réponse périmée/inconnue est simplement ignorée.
+    function fulfillRandomWords(uint256 requestId, uint256[] calldata randomWords) internal override {
+        uint256 jobId = vrfRequestJob[requestId];
+        if (jobId == 0) return;
+        DrawRequest storage r = pendingDraw[jobId];
         Job storage j = jobs[jobId];
         Dispute storage d = disputes[jobId];
-        DisputeExt storage x = disputeExt[jobId];
-        if (j.status != Status.Disputed || d.committeeSelected) revert InvalidState();
-        bool isAppeal = x.appellant != address(0);
-        if (msg.sender != (isAppeal ? x.appellant : d.challenger)) revert NotAllowed();
-        if (block.timestamp < d.seedRevealEarliest) revert TooEarly();
-        if (block.timestamp > d.seedRevealDeadline) revert TooLate();
-        if (keccak256(abi.encode(seed)) != d.seedCommit) revert BadCommit();
-
-        bytes32 bh = blockhash(uint256(d.commitBlock) + 1);
-        // HARDENING-01 : plus de repli manipulable sur blockhash(block.number - 1).
-        if (bh == bytes32(0)) revert TooLate();
-        bytes32 rnd = keccak256(abi.encode(seed, bh, jobId));
-        x.random = rnd;
-
-        uint256 k = params.committeeSize;
-        if (isAppeal) {
-            // FIX-2b : le 1er comité est conservé à part ; ses votes restent dans memberVote
-            // (adresses disjointes du comité d'appel), il est réglé au verdict final.
-            address[] storage first = _committees[jobId];
-            for (uint256 i = 0; i < first.length; ++i) _firstCommittees[jobId].push(first[i]);
-            delete _committees[jobId];
-            d.votesValid = 0;
-            d.votesInvalid = 0;
-            x.appealSelected = true;
-            k = securityParams.appealCommitteeSize;
-        }
-        _draw(jobId, j, d, uint256(rnd), k);
+        if (r.requestId != requestId || j.status != Status.Disputed || d.committeeSelected) return;
+        r.requestId = 0;
+        uint256 rnd = randomWords[0];
+        disputeExt[jobId].random = bytes32(rnd);
+        _draw(jobId, j, d, rnd, r.k);
 
         Params memory p = params;
         d.committeeSelected = true;
         d.voteCommitDeadline = uint64(block.timestamp + p.voteCommitWindow);
         j.disputeDeadline = uint64(block.timestamp + p.voteCommitWindow + p.voteRevealWindow);
-        if (isAppeal) emit AppealCommitteeSelected(jobId, _committees[jobId]);
+        emit DrawFulfilled(jobId, requestId, rnd);
+        if (disputeExt[jobId].appealSelected) emit AppealCommitteeSelected(jobId, _committees[jobId]);
         emit CommitteeSelected(jobId, _committees[jobId], d.voteCommitDeadline, j.disputeDeadline);
     }
 
@@ -472,7 +513,8 @@ contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable {
     }
 
     // ------------------------------------------------------------------
-    // FIX-1 : délai de révélation dépassé -> slash des non-révélateurs + re-tirage sans eux
+    // FIX-1 / VRF-01 : délai de révélation dépassé -> caution ENTIÈRE des non-révélateurs saisie,
+    // exclusion, puis re-tirage par une NOUVELLE requête VRF (personne ne choisit l'aléa)
     // ------------------------------------------------------------------
     function rerollNonRevealers(uint256 jobId) external nonReentrant {
         Job storage j = jobs[jobId];
@@ -497,7 +539,7 @@ contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable {
                 memberVote[jobId][v] = 5; // exclu définitivement de ce litige
                 verifiers[v].duties -= 1;
                 lastDutyEnd[v] = uint64(block.timestamp);
-                toBurn += _penalize(jobId, v, d.verifierPenalty);
+                toBurn += _penalize(jobId, v, type(uint256).max);
                 removed[nRemoved++] = v;
                 committee[i] = committee[committee.length - 1];
                 committee.pop();
@@ -509,22 +551,17 @@ contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable {
         assembly ("memory-safe") { mstore(removed, nRemoved) }
 
         x.rerolls += 1;
-        // Aléa : aléa du tirage initial + compteur + blockhash courant (n'importe qui peut appeler).
-        uint256 rnd = uint256(keccak256(abi.encode(x.random, x.rerolls, blockhash(block.number - 1))));
-        _draw(jobId, j, d, rnd, nRemoved);
-
-        Params memory p = params;
-        d.voteCommitDeadline = uint64(block.timestamp + p.voteCommitWindow);
-        j.disputeDeadline = uint64(block.timestamp + p.voteCommitWindow + p.voteRevealWindow);
+        // Les votes déjà révélés sont conservés ; votes/résolution/appel bloqués jusqu'au callback VRF.
+        d.committeeSelected = false;
         _burn(toBurn);
-        emit CommitteeRerolled(jobId, removed, committee, d.voteCommitDeadline, j.disputeDeadline);
+        emit CommitteeRerolled(jobId, removed, _requestDraw(jobId, nRemoved));
     }
 
     // ------------------------------------------------------------------
     // FIX-2b : appel (un seul tour) — la partie perdante dépose une caution plus élevée,
-    // un comité plus large (appealCommitteeSize) est tiré par commit-reveal.
+    // un comité plus large (appealCommitteeSize) est tiré par VRF.
     // ------------------------------------------------------------------
-    function appeal(uint256 jobId, bytes32 seedCommit) external nonReentrant {
+    function appeal(uint256 jobId) external nonReentrant {
         Job storage j = jobs[jobId];
         Dispute storage d = disputes[jobId];
         DisputeExt storage x = disputeExt[jobId];
@@ -534,7 +571,6 @@ contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable {
         if (_isFrozen(x)) revert Frozen();
         if (block.timestamp <= j.disputeDeadline) revert TooEarly();
         if (block.timestamp > uint256(j.disputeDeadline) + sp.appealWindow) revert TooLate();
-        if (seedCommit == bytes32(0)) revert BadCommit();
         (bool decided, bool providerValid) = majorityOf(jobId);
         if (!decided) revert NoMajority();
         // perdant : fournisseur si travail jugé invalide ; sinon contestataire ou créateur
@@ -549,12 +585,16 @@ contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable {
         x.appellant = msg.sender;
         x.appealBond = bond;
         x.firstVerdictValid = providerValid;
-        d.seedCommit = seedCommit;
-        d.commitBlock = uint64(block.number);
-        d.seedRevealEarliest = uint64(block.timestamp + params.seedRevealDelay);
-        d.seedRevealDeadline = uint64(block.timestamp + params.seedRevealWindow);
+        // Le 1er comité est conservé à part ; ses votes restent dans memberVote
+        // (adresses disjointes du comité d'appel), il est réglé au verdict final.
+        address[] storage first = _committees[jobId];
+        for (uint256 i = 0; i < first.length; ++i) _firstCommittees[jobId].push(first[i]);
+        delete _committees[jobId];
+        d.votesValid = 0;
+        d.votesInvalid = 0;
+        x.appealSelected = true;
         d.committeeSelected = false;
-        emit AppealFiled(jobId, msg.sender, bond, seedCommit, d.seedRevealDeadline);
+        emit AppealFiled(jobId, msg.sender, bond, _requestDraw(jobId, sp.appealCommitteeSize));
     }
 
     // ------------------------------------------------------------------
@@ -577,30 +617,6 @@ contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable {
 
     function _isFrozen(DisputeExt storage x) internal view returns (bool) {
         return block.timestamp < x.frozenUntil;
-    }
-
-    /// @notice Seed non révélé à temps : caution brûlée, job repasse en Completed (finalisable).
-    function expireUnrevealedChallenge(uint256 jobId) external nonReentrant {
-        Job storage j = jobs[jobId];
-        Dispute storage d = disputes[jobId];
-        if (j.status != Status.Disputed || d.committeeSelected) revert InvalidState();
-        if (block.timestamp <= d.seedRevealDeadline) revert TooEarly();
-        DisputeExt storage x = disputeExt[jobId];
-        if (x.appellant != address(0)) {
-            // FIX-2b : l'appelant n'a pas révélé -> appel échoué, verdict du 1er comité appliqué
-            if (_isFrozen(x)) revert Frozen();
-            d.committeeSelected = true;
-            _settle(jobId, j, x.firstVerdictValid, false);
-            return;
-        }
-        uint256 bond = d.bond;
-        d.bond = 0;
-        j.status = Status.Completed;
-        // HARDENING-02 : -1 pour qu'une nouvelle contestation dans le même bloc soit impossible
-        // (finalizeJob exige timestamp > challengeDeadline, challengeJob exige timestamp <= challengeDeadline).
-        j.challengeDeadline = uint64(block.timestamp - 1); // finalisable immédiatement
-        _burn(bond);
-        emit ChallengeExpired(jobId, d.challenger, bond);
     }
 
     // ------------------------------------------------------------------
@@ -687,10 +703,11 @@ contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable {
             return;
         }
         if (x.appellant != address(0)) revert InvalidState(); // appel : résolu par resolveDispute/expire
-        // comité non sélectionné : autoriser après seedRevealDeadline
+        // VRF non servi (tirage initial ou re-tirage) : autoriser après requestTimeout
         if (!d.committeeSelected) {
-            if (block.timestamp <= d.seedRevealDeadline) revert TooEarly();
-            if (block.timestamp > uint256(d.seedRevealDeadline) + params.arbitrationWindow) revert TooLate();
+            uint256 base = _drawTimeoutAt(jobId);
+            if (block.timestamp <= base) revert TooEarly();
+            if (block.timestamp > base + params.arbitrationWindow) revert TooLate();
         } else {
             if (block.timestamp <= j.disputeDeadline) revert TooEarly();
             if (block.timestamp > uint256(j.disputeDeadline) + params.arbitrationWindow) revert TooLate();
@@ -706,7 +723,7 @@ contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable {
         if (j.status != Status.Disputed) revert InvalidState();
         DisputeExt storage x = disputeExt[jobId];
         if (x.appellant != address(0) || _isFrozen(x)) revert InvalidState();
-        uint256 base = d.committeeSelected ? uint256(j.disputeDeadline) : uint256(d.seedRevealDeadline);
+        uint256 base = d.committeeSelected ? uint256(j.disputeDeadline) : _drawTimeoutAt(jobId);
         if (block.timestamp <= base + params.arbitrationWindow) revert TooEarly();
         if (d.committeeSelected) {
             (bool decided,) = majorityOf(jobId);
@@ -720,7 +737,7 @@ contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable {
             lastDutyEnd[v] = uint64(block.timestamp);
             // pas de reveal (1 ou 2) = absent
             uint8 mv = memberVote[jobId][v];
-            if (mv == 1 || mv == 2) toBurn += _penalize(jobId, v, d.verifierPenalty);
+            if (mv == 1 || mv == 2) toBurn += _penalize(jobId, v, type(uint256).max);
         }
         _unlockProvider(j);
         uint256 bond = d.bond;
@@ -728,6 +745,10 @@ contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable {
         if (bond > 0) superToken.safeTransfer(d.challenger, bond);
         _refundCreator(jobId, j);
         _burn(toBurn);
+    }
+
+    function _drawTimeoutAt(uint256 jobId) internal view returns (uint256) {
+        return uint256(pendingDraw[jobId].requestedAt) + vrfConfig.requestTimeout;
     }
 
     function _settle(uint256 jobId, Job storage j, bool providerValid, bool byArbiter) internal {
@@ -792,11 +813,12 @@ contract SuperionJobMarketplaceV2 is AccessControl, ReentrancyGuard, Pausable {
             address v = committee[i];
             verifiers[v].duties -= 1;
             lastDutyEnd[v] = uint64(block.timestamp);
-            if (memberVote[jobId][v] == winningVote) {
+            uint8 mv = memberVote[jobId][v];
+            if (mv == winningVote) {
                 winners++;
             } else {
-                // minoritaire, absent, ou commit non révélé
-                toBurn += _penalize(jobId, v, penalty);
+                // VRF-01 : absent / commit non révélé -> caution entière ; minoritaire -> pénalité fixe
+                toBurn += _penalize(jobId, v, (mv == 1 || mv == 2) ? type(uint256).max : penalty);
             }
         }
     }
