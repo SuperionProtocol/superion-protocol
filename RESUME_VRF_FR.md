@@ -32,3 +32,18 @@
 **Base Sepolia** : voir `deployments/vrf.baseSepolia.json` (adresses, subId, transactions, test de bout en bout).
 Coordinateur `0x5C210eF41CD1a72de73bF76eC39637bB0d3d7BEE`, keyHash 30 gwei `0x9e1344a1247c8a1785d0a4681a27152bffdb43666ae5bf7d14d24a5efd44bf71`, prime 60 % (ETH).
 **Base mainnet (pour plus tard)** : coordinateur `0xd5D517aBE5cF79B7e95eC98dB0f0277788aFF634`, keyHash 2 gwei `0x00b81b5a830cb0a4009fbd8904de511e28631e62ce5ad231373d3cdad373ccab`, keyHash 30 gwei `0xdc2f87677b01473c763cb0aee938ed3341512f6057324a584e5944e786144d70`, LINK `0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196`, prime 60 % ETH / 50 % LINK, max 2,5 M gaz, 0 confirmation min. (Source : docs.chain.link/vrf/v2-5/supported-networks, consulté le 21/10/2026.)
+
+## État du test de bout en bout en direct (Base Sepolia) — 21/10/2026, 21:20 CEST
+
+**NON CONFIRMÉ.** Le tirage VRF du litige sur le job 1 n'a jamais été livré par Chainlink. Les étapes après la contestation (comité, re-tirage, vote, résolution) **n'ont donc pas été exécutées en direct** ; elles ne sont couvertes que par les tests locaux (mock officiel).
+
+Diagnostic (lecture on-chain) — notre configuration est correcte :
+- marketplace `0xa4E1…E342` bien consommateur de l'abonnement ; solde 0,06 ETH (LINK 0) ; `reqCount` = 0 ;
+- keyHash 30 gwei `0x9e13…bf71` = la seule voie Base Sepolia (docs Chainlink), enregistrée sur le coordinateur ; callbackGasLimit 500 000 ≤ max 2 500 000 ; confirmations 1 ;
+- engagement de requête présent dans le coordinateur (la requête existe, en attente).
+
+Cause : **panne du nœud Chainlink VRF sur Base Sepolia**. Le dernier `RandomWordsFulfilled` du coordinateur, tous consommateurs confondus, date du bloc 48417443 (19:19 CEST) ; depuis, ~10 requêtes d'au moins 6 contrats différents (dont les nôtres) restent sans réponse. Avant, les réponses arrivaient en ~6 blocs. Rien à corriger dans la config testnet ; aucune proposition Timelock n'aiderait (pas d'autre voie).
+
+Actions : `retryDraw(1)` tx `0x2c3fc53ea6577dc558a34f343896b2985b45bb9b60b065eae4abcfeac7bae8de` (21:00 CEST) → nouvelle requête `3619566267…8618450` ; attente de 15 min sans `DrawFulfilled`. Mécanisme retry vérifié en direct (ancienne requête invalidée).
+
+Reprise : quand Chainlink Base Sepolia répond de nouveau, `retryDraw(1)` (si > 10 min) puis relancer `npx hardhat run scripts/v2/e2e-vrf-sepolia.cjs --network baseSepolia` (reprenable).
