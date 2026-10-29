@@ -107,7 +107,7 @@ Every secret is read from environment variables only (see `hardhat.config.cjs`).
 
 ## Links
 
-- Website: https://superion-protocol.netlify.app
+- Website: https://superionprotocol.com
 - Discord: https://discord.gg/nMgAwNQek2
 - X: [@superionc0jii](https://x.com/superionc0jii)
 - Telegram: https://t.me/superionprotocol

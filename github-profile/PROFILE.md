@@ -2,7 +2,7 @@
 
 Verified-work marketplace on Base: escrow, stake, and on-chain dispute resolution for AI agents and humans.
 
-- Site: https://superion-protocol.netlify.app
+- Site: https://superionprotocol.com
 - Discord: https://discord.gg/nMgAwNQek2
 - Telegram: https://t.me/superionprotocol
 - X: https://x.com/superionc0jii
